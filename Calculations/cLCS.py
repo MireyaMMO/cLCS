@@ -27,11 +27,12 @@ class cLCS:
       return lambda0,theta0
 
   def compute_squeeze_lines(self,dirr,monthvec):
+  #Loads averaged C-G, and compute squeezelines 
+  # dirr: directory where the climatological files are located (same dirr as used in mean_C
+  # monthvec: month to ve analysed
       m = '%02d' %  monthvec
       dirr2=dirr+m+'/'
-      lon,lat,lda2total,sqrtlda2total,T,ftletotal,C11total,C22total,C12total,xspan,yspan,count = pickle.load(open(dirr2+'TOT-6h-'+m+'.p', 'rb'))
-      Nt=monthrange(2020, monthvec)[1]
-      Tvec=np.arange(-Nt,T)[::-1]
+      lon,lat,lda2total,sqrtlda2total,T,ftletotal,C11total,C22total,C12total,xspan,yspan,count = pickle.load(open(dirr2+'TOT-'+m+'.p', 'rb'))
       N=count
       C11=C11total/N
       C22=C22total/N
@@ -41,6 +42,12 @@ class cLCS:
       pickle.dump([pxt,pyt], open(dirr2+'/cLCS_'+m+'.p', 'wb'))
 
   def squeezeline(self, C11,C12,C22,xi,yi,ArcLength):
+  # SQUEEZELINE Line field intergrator.
+  # [XS, YS] = SQUEEZELINE(C11,C12,C22, X, Y, SSPAN) 
+  # computes squeezelines from the Cauchy-Green tensor entries C11, C12 and C22 which are a function of (X,Y)
+  # Each column of XS, YS is a squeezeline
+  # This functions integrates the line field (Lx(X,Y),Ly(X,Y))  from SSPAN(1) to SSPAN(2).
+  # To get squeezelines in lon lat do [pxt2,pyt2]=xy2sph(pxt*1e3, min(lon0), pyt*1e3, min(lat0));
       detC = (C11*C22) - (C12**2)
       trC = C11 + C22
       lda1 = np.real(.5*trC - np.sqrt(.25*trC**2 - detC))
