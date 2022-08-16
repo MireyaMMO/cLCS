@@ -75,7 +75,8 @@ def colormap():
     [0.7874,        0,        0,1],
     [0.6982,        0,        0,1],
     [0.6000,   0.0069,    0.0013,1]])
-  return newcmap=LinearSegmentedColormap.from_list('mycmap',s)
+   newcmap=LinearSegmentedColormap.from_list('mycmap',s)
+   return newcmap
 
 def plot_colourline(x,y,c,cmap,ax=None,transform=None):
   #Plots LCSs using colouredlines to define intensity
@@ -115,9 +116,9 @@ def cLCSrho_cartopy(dirr,monthvec,fig=None,ax=None):
   #Plots cLCS using cartopy
   #check projection line as the one used is for New Zealand due to the +-180
   projection=ccrs.PlateCarree(central_longitude=180)
-  if fig=None:
+  if fig==None:
     fig= plt.figure(figsize=(8, 6),constrained_layout=True)
-  if ax=None:
+  if ax==None:
     ax = fig.add_subplot(projection=projection)
   f = cfeature.GSHHSFeature(scale='high',levels=[1])
   ax.add_geometries(
