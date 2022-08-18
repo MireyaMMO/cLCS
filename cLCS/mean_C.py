@@ -148,7 +148,7 @@ def mean_C(dirr,filename,month,T,dt=None,time_step_output=None):
      o.set_config('environment:fallback:y_wind', 0.0)
      o.set_config('environment:fallback:x_sea_water_velocity', 0.0)
      o.set_config('environment:fallback:y_sea_water_velocity', 0.0)
-     o.set_config('environment:fallback:sea_floor_depth_below_sea_level', 10000.0
+     o.set_config('environment:fallback:sea_floor_depth_below_sea_level', 10000.0)
      o.set_config('environment:fallback:land_binary_mask', 0)
      o.set_config('drift:advection_scheme','runge-kutta4') # or 'runge-kutta'
      o.set_config('drift:current_uncertainty', 0.0 ) # note current_uncertainty can be used to replicate an horizontal diffusion spd_uncertain = sqrt(Kxy*2/dt)
