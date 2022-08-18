@@ -1,0 +1,11 @@
+Metadata-Version: 1.2
+Name: cLCS
+Version: 0.1
+Summary: A python package to compute Climatological Lagrangian Coherent structures as described by Rodrigo Duran for Matlab using OpenDrift
+Author: Rodrigo Duran adapted to python by Mireya Montano
+Author-email: mireya.mmor@gmail.com
+License: GPLv3
+Description:
+        
+Platform: UNKNOWN
+Requires-Python: >=3.6
