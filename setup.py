@@ -28,10 +28,5 @@ setuptools.setup(
         'datetime'
     ],
     packages = setuptools.find_packages(),
-    include_package_data = True,
-    scripts = ['opendrift/scripts/hodograph.py',
-               'opendrift/scripts/readerinfo.py',
-               'opendrift/scripts/opendrift_plot.py',
-               'opendrift/scripts/opendrift_animate.py',
-               'opendrift/scripts/opendrift_gui.py',
-               'opendrift/scripts/mp4_to_gif.bash']
+    include_package_data = True
+)
