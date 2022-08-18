@@ -1,17 +1,24 @@
 #!/usr/bin/env python
+#!/usr/bin/env python
 
-import setuptools
+ import os
+ import setuptools
 
-setuptools.setup(
-    name        = 'cLCS',
-    version     = '1',
-    author='Rodrigo Duran adapted to python by Mireya Montaño',
-    packages=['cLCS'],
-    license='',
-    url='',
-    description='Climatological LCS code for python using OpenDrift as seen in Rodrigo Duran code for Matlab',
-#    long_description=open('README.rst').read(),
-    install_requires=[
+ here = os.path.abspath(os.path.dirname(__file__))
+ exec(open(os.path.join(here)).read())
+
+ setuptools.setup(
+     name        = 'cLCS',
+     description = 'Climatological LCS code for python using OpenDrift as seen in Rodrigo Duran code for Matlab ',
+     author      = 'Rodrigo Duran adapted to python by Mireya Montano',
+     url         = 'https://github.com/MireyaMMO/cLCS',
+     download_url = 'https://github.com/MireyaMMO/cLCS',
+     version = 1,
+     license = '',
+#     packages=['cLCS'],
+     description='Climatological LCS code for python using OpenDrift as seen in Rodrigo Duran code for Matlab',
+ #    long_description=open('README.rst').read(),
+     install_requires=[
         'numpy',
         'scipy',
         'matplotlib',
@@ -23,5 +30,7 @@ setuptools.setup(
         'opendrift'
         'pickle'
         'datetime'
-      ],
-)
+     ],
+     packages = setuptools.find_packages(),
+     include_package_data = True
+ )
