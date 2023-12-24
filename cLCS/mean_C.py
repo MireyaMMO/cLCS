@@ -1,13 +1,10 @@
 import os
-import sys
 import numpy as np
 from datetime import datetime, timedelta
 import pickle
-import opendrift
 import numpy.ma as ma
 from netCDF4 import Dataset
 from cLCS.utils import *
-import importlib
 
 
 def create_seed_times(start, end, delta):
@@ -21,6 +18,7 @@ def create_seed_times(start, end, delta):
         out.append(start_t)
         start_t += delta
     return out
+
 
 class mean_C(object):
     """
@@ -65,85 +63,87 @@ class mean_C(object):
             xspan, yspan: x,y coordinates (km)
             count: number of deploys, important to obtain averages
     """
+
     def __init__(
-      self,
-      dirr, 
-      climatology_file, 
-      month, 
-      T, 
-      dt=6, #six hour time step
-      time_step_output=86400, #daily output
-      z=0, #surface
-      opendrift_reader='reader_ROMS_native_MOANA', 
-      opendrift_model='OceanDrift', 
-      vars_dict={'mask': 'mask_rho'}
-      ):
-      # Import opendrift modules
-      self.dirr = dirr
-      self.climatology_file = climatology_file
+        self,
+        dirr,
+        climatology_file,
+        month,
+        T,
+        dt=6,  # six hour time step
+        time_step_output=86400,  # daily output
+        z=0,  # surface
+        opendrift_reader='reader_ROMS_native_MOANA',
+        opendrift_model='OceanDrift',
+        vars_dict={'mask': 'mask_rho'}
+    ):
+        # Import opendrift modules
+        self.dirr = dirr
+        self.climatology_file = climatology_file
 #      self.climatology_file = dirr+filename
-      self.month = month 
-      self.T = T
-      self.dt = dt
-      self.time_step_output = time_step_output
-      if isinstance(self.month, int):
-          self.m = '%02d' % self.month
-      self.new_directory = os.path.join(self.dirr, self.m)
-      self.opendrift_reader = opendrift_reader
-      self.opendrift_model = opendrift_model
-      exec(f'from opendrift.readers import {self.opendrift_reader}')
-      exec(
-          f'from opendrift.models.{self.opendrift_model.lower()} import {self.opendrift_model}')
-      self.vars_dict = vars_dict
-      self.z = z
-      # Cauchy-Green terms
-      self.lda2total = 0
-      self.sqrtlda2total = 0
-      self.ftletotal = 0
-      self.C11total = 0
-      self.C22total = 0
-      self.C12total = 0
-      
+        self.month = month
+        self.T = T
+        self.dt = dt
+        self.time_step_output = time_step_output
+        if isinstance(self.month, int):
+            self.m = '%02d' % self.month
+        self.new_directory = os.path.join(self.dirr, self.m)
+        self.opendrift_reader = opendrift_reader
+        self.opendrift_model = opendrift_model
+        exec(f'from opendrift.readers import {self.opendrift_reader}')
+        exec(
+            f'from opendrift.models.{self.opendrift_model.lower()} import {self.opendrift_model}')
+        self.vars_dict = vars_dict
+        self.z = z
+        # Cauchy-Green terms
+        self.lda2total = 0
+        self.sqrtlda2total = 0
+        self.ftletotal = 0
+        self.C11total = 0
+        self.C22total = 0
+        self.C12total = 0
+
     def set_directories(self):
         """Create output directories."""
         if not os.path.isdir(self.new_directory):
             os.makedirs(self.new_directory)
-            
+
     def set_opendrift_configuration(self, file):
-      o = eval(self.opendrift_model)(loglevel=20)
-      reader = eval(self.opendrift_reader)(file)
-      # dynamical landmask if true
-      o.set_config('general:use_auto_landmask', False)
-      o.max_speed = 5.0
-      o.add_reader(reader)  # This adds the reader
-      # seed
-      # keep only particles from the "frame" that are on the ocean
-      o.set_config('seed:ocean_only', True)
-      ###############################
-      # PHYSICS of Opendrift
-      ###############################
-      o.set_config('environment:fallback:x_wind', 0.0)
-      o.set_config('environment:fallback:y_wind', 0.0)
-      o.set_config('environment:fallback:x_sea_water_velocity', 0.0)
-      o.set_config('environment:fallback:y_sea_water_velocity', 0.0)
-      o.set_config(
-          'environment:fallback:sea_floor_depth_below_sea_level', 10000.0)
+        o = eval(self.opendrift_model)(loglevel=20)
+        reader = eval(self.opendrift_reader)(file)
+        # dynamical landmask if true
+        o.set_config('general:use_auto_landmask', False)
+        o.max_speed = 5.0
+        o.add_reader(reader)  # This adds the reader
+        # seed
+        # keep only particles from the "frame" that are on the ocean
+        o.set_config('seed:ocean_only', True)
+        ###############################
+        # PHYSICS of Opendrift
+        ###############################
+        o.set_config('environment:fallback:x_wind', 0.0)
+        o.set_config('environment:fallback:y_wind', 0.0)
+        o.set_config('environment:fallback:x_sea_water_velocity', 0.0)
+        o.set_config('environment:fallback:y_sea_water_velocity', 0.0)
+        o.set_config(
+            'environment:fallback:sea_floor_depth_below_sea_level', 10000.0)
 
-      # drift
-      o.set_config('environment:fallback:land_binary_mask', 0)
-      o.set_config('drift:advection_scheme', 'runge-kutta4')  # or 'runge-kutta'
-      # note current_uncertainty can be used to replicate an horizontal diffusion s
-      o.set_config('drift:current_uncertainty', 0.0)
+        # drift
+        o.set_config('environment:fallback:land_binary_mask', 0)
+        o.set_config('drift:advection_scheme',
+                     'runge-kutta4')  # or 'runge-kutta'
+        # note current_uncertainty can be used to replicate an horizontal diffusion s
+        o.set_config('drift:current_uncertainty', 0.0)
 
-      Kxy = 0.1  # m2/s-1
-      # using new config rather than current uncertainty
-      o.set_config('drift:horizontal_diffusivity', Kxy)
+        Kxy = 0.1  # m2/s-1
+        # using new config rather than current uncertainty
+        o.set_config('drift:horizontal_diffusivity', Kxy)
 
-      o.disable_vertical_motion()
-      o.list_config()
-      o.list_configspec()
-      return o, reader
-    
+        o.disable_vertical_motion()
+        o.list_config()
+        o.list_configspec()
+        return o, reader
+
     def seed_particles_full_grid(self, reader, file):
         lon = reader.lon
         lat = reader.lat
@@ -173,9 +173,9 @@ class mean_C(object):
 
         lon0 = ma.masked_where(np.isnan(lon0), lon0)
         lat0 = ma.masked_where(np.isnan(lat0), lat0)
-        nonanindex = np.invert(np.isnan(lon0)) #non-land particles
+        nonanindex = np.invert(np.isnan(lon0))  # non-land particles
         return lon0, lat0, nonanindex
-    
+
     def obtain_final_particle_position(self, o, lon0, lat0, nonanindex):
         lon_OpenDrift = o.history['lon'][:]
         lat_OpenDrift = o.history['lat'][:]
@@ -205,80 +205,86 @@ class mean_C(object):
         return end_lon, end_lat
 
     def lat_lon_to_x_y(self, end_lon, end_lat):
-        [end_x, end_y] = sph2xy(end_lon, self.lon_origin, end_lat, self.lat_origin)
+        [end_x, end_y] = sph2xy(end_lon, self.lon_origin,
+                                end_lat, self.lat_origin)
         end_x = end_x*1e-3
         end_y = end_y*1e-3
         end_x = end_x.reshape(self.Nx0, self.Ny0)
         end_y = end_y.reshape(self.Nx0, self.Ny0)
         return end_x, end_y
-        
+
     def calculate_Cauchy_Green(self, end_x, end_y):
-          dxdy, dxdx = np.gradient(end_x, self.dy0, self.dx0)
-          dydy, dydx = np.gradient(end_y, self.dy0, self.dx0)
-          dxdx0 = np.reshape(dxdx, (self.Nx0, self.Ny0))
-          dxdy0 = np.reshape(dxdy, (self.Nx0, self.Ny0))
-          dydx0 = np.reshape(dydx, (self.Nx0, self.Ny0))
-          dydy0 = np.reshape(dydy, (self.Nx0, self.Ny0))
-          C11 = (dxdx0**2) + (dydx0**2)
-          C12 = (dxdx0*dxdy0) + (dydx0*dydy0)
-          C22 = (dxdy0**2) + (dydy0**2)
-          detC = (C11*C22) - (C12**2)
-          trC = C11 + C22
-          lda2 = np.real(.5*trC + np.sqrt(.25*trC**2 - detC))
-          ftle = np.log(lda2)/(2*np.abs(self.T))
-          return C11, C12, C22, lda2, ftle
+        dxdy, dxdx = np.gradient(end_x, self.dy0, self.dx0)
+        dydy, dydx = np.gradient(end_y, self.dy0, self.dx0)
+        dxdx0 = np.reshape(dxdx, (self.Nx0, self.Ny0))
+        dxdy0 = np.reshape(dxdy, (self.Nx0, self.Ny0))
+        dydx0 = np.reshape(dydx, (self.Nx0, self.Ny0))
+        dydy0 = np.reshape(dydy, (self.Nx0, self.Ny0))
+        C11 = (dxdx0**2) + (dydx0**2)
+        C12 = (dxdx0*dxdy0) + (dydx0*dydy0)
+        C22 = (dxdy0**2) + (dydy0**2)
+        detC = (C11*C22) - (C12**2)
+        trC = C11 + C22
+        lda2 = np.real(.5*trC + np.sqrt(.25*trC**2 - detC))
+        ftle = np.log(lda2)/(2*np.abs(self.T))
+        return C11, C12, C22, lda2, ftle
 
     def run(self):
-      self.set_directories() # creates directory for output
-      o, reader = self.set_opendrift_configuration(self.climatological_file)
+        self.set_directories()  # creates directory for output
+        o, reader = self.set_opendrift_configuration(self.climatological_file)
 
-      ######################################
-      # Defines the times to run (1 per day)
-      ######################################
-      if self.T < 0:
-          runtime = [reader.start_time +
-                    timedelta(days=int(np.abs(self.T))), reader.end_time+timedelta(days=1)]
-      elif self.T > 0:
-          runtime = [reader.start_time, reader.end_time -
-                    timedelta(days=int(np.abs(self.T)))]
+        ######################################
+        # Defines the times to run (1 per day)
+        ######################################
+        if self.T < 0:
+            runtime = [reader.start_time +
+                       timedelta(days=int(np.abs(self.T))), reader.end_time+timedelta(days=1)]
+        elif self.T > 0:
+            runtime = [reader.start_time, reader.end_time -
+                       timedelta(days=int(np.abs(self.T)))]
 
-      time = create_seed_times(runtime[0], runtime[1], timedelta(days=1))
-      time_step = timedelta(hours=self.dt)
-      duration = timedelta(days=int(np.abs(self.T)))
+        time = create_seed_times(runtime[0], runtime[1], timedelta(days=1))
+        time_step = timedelta(hours=self.dt)
+        duration = timedelta(days=int(np.abs(self.T)))
 
-      self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(reader, self.climatological_file)
-      
-      for count, t in enumerate(time):
-          # These lines are repeated as this will generate a deploy for each day allowing us to calculate the Cauchy Green tensors needed for the cLCS calculation
-          # Set loglevel to 0 for debug information
-          o, reader = self.set_opendrift_configuration(self.climatological_file, log_level=self.log_level)
-          d = '%02d' % t.day
-          namefile = f'{self.new_directory}/Trajectories_{self.m}{d}.nc'
-          o.seed_elements(self.lon0[nonanindex], self.lat0[nonanindex],
-                          time=t, z=self.z)
-          # Foward in time
-          if self.T > 0:
-              o.run(duration=duration, time_step=time_step,
-                    time_step_output=self.time_step_output, outfile=namefile)
-          # Backward in time
-          elif self.T < 0:
-              o.run(duration=duration, time_step=-time_step,
-                    time_step_output=self.time_step_output, outfile=namefile)
+        self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(
+            reader, self.climatological_file)
 
-          end_lon, end_lat = self.obtain_final_particle_position(o, self.lon0, self.lat0, nonanindex)
-          
-          end_x, end_y = self.lat_lon_to_x_y(end_lon,end_lat)
-          
-          C11, C12, C22, lda2, ftle = self.calculate_cauchy_green(end_x, end_y)
+        for count, t in enumerate(time):
+            # These lines are repeated as this will generate a deploy for each day allowing us to calculate the Cauchy Green tensors needed for the cLCS calculation
+            # Set loglevel to 0 for debug information
+            o, reader = self.set_opendrift_configuration(
+                self.climatological_file, log_level=self.log_level)
+            d = '%02d' % t.day
+            namefile = f'{self.new_directory}/Trajectories_{self.m}{d}.nc'
+            o.seed_elements(self.lon0[nonanindex], self.lat0[nonanindex],
+                            time=t, z=self.z)
+            # Foward in time
+            if self.T > 0:
+                o.run(duration=duration, time_step=time_step,
+                      time_step_output=self.time_step_output, outfile=namefile)
+            # Backward in time
+            elif self.T < 0:
+                o.run(duration=duration, time_step=-time_step,
+                      time_step_output=self.time_step_output, outfile=namefile)
 
-          self.lda2total += lda2
-          self.sqrtlda2total += np.sqrt(lda2)
-          self.ftletotal += ftle
-          self.C11total += C11
-          self.C22total += C22
-          self.C12total += C12
-          
-          pickle.dump([C11, C22, C12], open(f'{self.new_directory}/LCS_{self.m}{d}_CG.p', 'wb'))
-      self.count = count
-      pickle.dump([self.lon0, self.lat0, self.lda2total, self.sqrtlda2total, self.T, self.ftletotal, self.C11total,
-                  self.C22total, self.C12total, self.xspan, self.yspan, self.count], open(f'{self.new_directory}/TOT-{self.m}.p', 'wb'))
+            end_lon, end_lat = self.obtain_final_particle_position(
+                o, self.lon0, self.lat0, nonanindex)
+
+            end_x, end_y = self.lat_lon_to_x_y(end_lon, end_lat)
+
+            C11, C12, C22, lda2, ftle = self.calculate_cauchy_green(
+                end_x, end_y)
+
+            self.lda2total += lda2
+            self.sqrtlda2total += np.sqrt(lda2)
+            self.ftletotal += ftle
+            self.C11total += C11
+            self.C22total += C22
+            self.C12total += C12
+
+            pickle.dump([C11, C22, C12], open(
+                f'{self.new_directory}/LCS_{self.m}{d}_CG.p', 'wb'))
+        self.count = count
+        pickle.dump([self.lon0, self.lat0, self.lda2total, self.sqrtlda2total, self.T, self.ftletotal, self.C11total,
+                    self.C22total, self.C12total, self.xspan, self.yspan, self.count], open(f'{self.new_directory}/TOT-{self.m}.p', 'wb'))

@@ -217,7 +217,7 @@ class compute_cLCS_squeezelines(object):
         m = '%02d' % self.monthvec
         month_dirr = self.dirr+m+'/'
         _, _, _, _, _, _, C11total, C22total, C12total, xspan, yspan, count = pickle.load(
-            open(month_dirr+'TOT-'+m+'.p', 'rb'))
+            open(f'{month_dirr}TOT-{m}.p', 'rb'))
         N = count
         C11 = C11total/N
         C22 = C22total/N
@@ -226,4 +226,4 @@ class compute_cLCS_squeezelines(object):
         self.pxt, self.pyt = self.squeezeline(
             C11, C12, C22, xspan[-1, :], yspan[:, -1], [0, ArcLength])
         pickle.dump([self.pxt, self.pyt], open(
-            month_dirr+'/cLCS_'+m+'.p', 'wb'))
+            f'{month_dirr}/cLCS_{m}.p', 'wb'))
