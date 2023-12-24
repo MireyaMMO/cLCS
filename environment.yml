@@ -1,5 +1,6 @@
-name: opendrift
+name: cLCS
 channels:
+  - opendrift
   - conda-forge
 dependencies:
   - matplotlib>=3.5
@@ -29,6 +30,7 @@ dependencies:
   - cmocean
   - utm
   - roaring-landmask>=0.7
+  - opendrift-landmask-data
   - trajan>=0.1.3
   - adios_db
   - ipykernel
