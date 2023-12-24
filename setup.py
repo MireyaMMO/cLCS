@@ -4,7 +4,7 @@ import os
 import setuptools
 
 here = os.path.abspath(os.path.dirname(__file__))
-exec(open(os.path.join(here)).read())
+#exec(open(os.path.join(here)).read())
 
 setuptools.setup(
     name        = 'cLCS',

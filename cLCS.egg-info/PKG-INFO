@@ -1,11 +1,14 @@
-Metadata-Version: 1.2
+Metadata-Version: 2.1
 Name: cLCS
-Version: 0.1
-Summary: A python package to compute Climatological Lagrangian Coherent structures as described by Rodrigo Duran for Matlab using OpenDrift
+Version: 1
+Summary: Climatological LCS code for python using OpenDrift as seen in Rodrigo Duran code for Matlab 
+Home-page: https://github.com/MireyaMMO/cLCS
+Download-URL: https://github.com/MireyaMMO/cLCS
 Author: Rodrigo Duran adapted to python by Mireya Montano
-Author-email: mireya.mmor@gmail.com
-License: GPLv3
-Description:
-        
-Platform: UNKNOWN
-Requires-Python: >=3.6
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib
+Requires-Dist: netCDF4
+Requires-Dist: pyproj
+Requires-Dist: cartopy
+Requires-Dist: opendrift-landmask-datacalendaropendriftpickledatetime
