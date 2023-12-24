@@ -20,7 +20,7 @@ def create_seed_times(start, end, delta):
     return out
 
 
-class mean_C(object):
+class mean_CG(object):
     """
     mean_C
     computes sequential Cauchy-Green tensors, and the average for the full period

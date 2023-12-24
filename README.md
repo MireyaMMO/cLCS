@@ -1,11 +1,20 @@
 # cLCS
-## Description
+- [cLCS](#clcs)
+  - [1.1. Description](#11-description)
+  - [1.2. Installation](#12-installation)
+  - [1.3. Contents](#13-contents)
+    - [cLCS](#clcs-1)
+    - [Examples](#examples)
+  - [1.4. References](#14-references)
+
+
+## 1.1. Description
 Climatological LCS based on the code developed by Rodrigo Duran for [Matlab](https://bitbucket.org/rodu/clcss/src/master/)
 
 This repository contains the scripts needed to deploy a series of particle releases using OpenDrift and calculate the  associated climatological Lagrangian Coherent Structures.
 
 
-## Requirements
+## 1.2. Installation
 To use this package OpenDrift is necessary. To facilitate and make the installation faster please use [mamba](https://github.com/conda-forge/miniforge). 
 As shown in the link to install on Unix-like platforms (Mac OS & Linux) use:
 ```
@@ -39,16 +48,16 @@ $ pip install --no-deps -e .
 
 ```
 
-## Contents
-- cLCS
-  - make_cLCS.py 
-  - mean_C.py: meanC computes monthly averages for each month
-  - plotting.py
+## 1.3. Contents
+### [cLCS](https://github.com/MireyaMMO/cLCS/tree/main/cLCS)
+  - [mean_C.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/mean_C.py) contains the [mean_CG](https://github.com/MireyaMMO/cLCS/blob/cc9eafca4116e073e67fece8c685dc00c995b066/cLCS/mean_C.py#L23C7-L23C13) class that deploys particles throughout the grid using OpenDrift and computes monthly averages Cauchy-Green tensors for each month (See Duran, et al., 2018 for more details on the methods).
+  - [make_cLCS.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/make_cLCS.py) contains the class [compute_cLCS_squeezelines](https://github.com/MireyaMMO/cLCS/blob/cc9eafca4116e073e67fece8c685dc00c995b066/cLCS/make_cLCS.py#L7C7-L7C7) which uses the provided Cauchy-Green tensors to compute the squeezelines associated to cLCS. 
+  - [plotting.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/plotting.py) contains functions to visualise the resulting cLCS using cartopy. 
 
-- Examples
+### Examples
   - jupyter_notebooks with examples 
 
-## References:
+## 1.4. References
 [Duran, R., Beron-Vera, F.J. & Olascoaga, M.J. Extracting quasi-steady Lagrangian transport patterns from the ocean circulation: An application to the Gulf of Mexico. Sci Rep 8, 5218 (2018). https://doi.org/10.1038/s41598-018-23121-y](https://www.nature.com/articles/s41598-018-23121-y)
 
 [Duran, R., F. J. Beron-Vera and M. J. Olascoaga (2019). Climatologial Lagrangian Coherent Structures code. DOI: 10.18141/1558781](https://bitbucket.org/rodu/clcss/src/master/)
