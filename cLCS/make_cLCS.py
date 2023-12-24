@@ -1,11 +1,7 @@
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.interpolate import interp1d, Rbf, griddata
-from scipy.integrate import odeint
-from scipy import integrate
 from calendar import monthrange
 import pickle
-import matplotlib.pyplot as plt
 
 
 class compute_cLCS_squeezelines(object):
@@ -116,7 +112,7 @@ class compute_cLCS_squeezelines(object):
         self.xi1_2b = sgn_0 * self.xi1_2b
         t_eval = np.arange(ArcLength[0], ArcLength[1], 1)
 
-        r = integrate.solve_ivp(
+        r = solve_ivp(
             self.fun,
             [ArcLength[0], ArcLength[1]],
             np.hstack((self.x0, self.y0)),
