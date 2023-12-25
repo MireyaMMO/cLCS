@@ -9,7 +9,8 @@ import os
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logger = logging 
+logger = logging
+
 
 def plot_colourline(x, y, c, cmap, ax=None, transform=None):
     # Plots LCSs using colouredlines to define intensity
@@ -29,7 +30,9 @@ def plot_blacklines(x, y, ax=None, transform=None):
     return
 
 
-def cLCSrho_cartopy(dirr, monthvec, colourmap=None,fig=None, ax=None, projection=None, line_spacing=4):
+def cLCSrho_cartopy(
+    dirr, monthvec, colourmap=None, fig=None, ax=None, projection=None, line_spacing=4
+):
     # Plots cLCS using cartopy
     # check projection line as the one used is for New Zealand due to the +-180
     if not projection:
@@ -47,7 +50,7 @@ def cLCSrho_cartopy(dirr, monthvec, colourmap=None,fig=None, ax=None, projection
     )
     m = "%02d" % monthvec
     month_dirr = os.path.join(dirr, m)
-    TOT_CG_path = os.path.join(month_dirr,f"TOT-{m}.p")
+    TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
     lon, lat, _, sqrtlda2total, _, _, _, _, _, xspan, yspan, count = pickle.load(
         open(TOT_CG_path, "rb")
     )

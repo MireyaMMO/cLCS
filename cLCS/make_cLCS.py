@@ -7,6 +7,7 @@ import logging.config
 
 logging.basicConfig(level=logging.INFO)
 
+
 class compute_cLCS_squeezelines(object):
     """
     Loads averaged C-G, and compute squeezelines

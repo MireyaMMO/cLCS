@@ -12,6 +12,7 @@ import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
 
+
 def create_seed_times(start, end, delta):
     """
     create times at given interval to seed particles
@@ -69,7 +70,7 @@ class mean_CG(object):
         Option to save the trajectories obtained from OpenDrift. Default False
     save_daily_CG = boolean
         Option to save the Cauchy Green Tensors for each day. Default False
-    
+
     Returns
     -------
     Output files:
@@ -105,7 +106,7 @@ class mean_CG(object):
         horizontal_diffusivity=0.1,
         advection_scheme="runge-kutta4",
         save_trajectories=False,
-        save_daily_CG = False,
+        save_daily_CG=False,
     ):
         # Environment parameters
         self.dirr = dirr
@@ -114,8 +115,8 @@ class mean_CG(object):
         if isinstance(self.month, int):
             self.m = "%02d" % self.month
         self.new_directory = os.path.join(self.dirr, self.m)
-        
-        #Particle release parameters
+
+        # Particle release parameters
         self.T = T
         self.dt = dt
         self.frequency_of_deployments = frequency_of_deployments
@@ -132,7 +133,7 @@ class mean_CG(object):
         self.advection_scheme = advection_scheme
         self.save_trajectories = save_trajectories
         self.save_daily_CG = save_daily_CG
-        
+
         # Cauchy-Green terms
         self.lda2total = 0
         self.sqrtlda2total = 0
@@ -140,7 +141,7 @@ class mean_CG(object):
         self.C11total = 0
         self.C22total = 0
         self.C12total = 0
-        
+
         # Log information
         self.logger = logging
 
@@ -186,8 +187,8 @@ class mean_CG(object):
         o.set_config("drift:horizontal_diffusivity", Kxy)
 
         o.disable_vertical_motion()
-#        o.list_config()
-#        o.list_configspec()
+        #        o.list_config()
+        #        o.list_configspec()
         return o, reader
 
     def seed_particles_full_grid(self, ds):
@@ -284,11 +285,11 @@ class mean_CG(object):
 
     def run(self):
         self.set_directories()  # creates directory for output
-#        _, reader = self.set_opendrift_configuration(self.climatology_file)
+        #        _, reader = self.set_opendrift_configuration(self.climatology_file)
         ds = xr.open_dataset(self.climatology_file)
-        start_time = pd.to_datetime(ds['ocean_time'][0].values)
-        end_time = pd.to_datetime(ds['ocean_time'][-1].values)
-        
+        start_time = pd.to_datetime(ds["ocean_time"][0].values)
+        end_time = pd.to_datetime(ds["ocean_time"][-1].values)
+
         if self.T < 0:
             runtime = [
                 start_time + timedelta(days=int(np.abs(self.T))),
@@ -300,13 +301,13 @@ class mean_CG(object):
                 end_time - timedelta(days=int(np.abs(self.T))),
             ]
 
-        time = create_seed_times(runtime[0], runtime[1], timedelta(days=self.frequency_of_deployments))
+        time = create_seed_times(
+            runtime[0], runtime[1], timedelta(days=self.frequency_of_deployments)
+        )
         time_step = timedelta(hours=self.dt)
         duration = timedelta(days=int(np.abs(self.T)))
 
-        self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(
-            ds
-        )
+        self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(ds)
 
         for count, t in enumerate(time):
             # These lines are repeated as this will generate a deploy for each day allowing us to calculate the Cauchy Green tensors needed for the cLCS calculation
@@ -353,7 +354,7 @@ class mean_CG(object):
             self.C11total += C11
             self.C22total += C22
             self.C12total += C12
-            if self.save_daily_CG:  
+            if self.save_daily_CG:
                 pickle.dump(
                     [C11, C22, C12],
                     open(f"{self.new_directory}/LCS_{self.m}{d}_CG.p", "wb"),
