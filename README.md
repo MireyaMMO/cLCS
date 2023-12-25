@@ -21,9 +21,9 @@ This repository contains the scripts needed to deploy a series of particle relea
 To use this package OpenDrift is necessary. To facilitate and make the installation faster please use [mamba](https://github.com/conda-forge/miniforge). 
 Example of how to install on Unix-like platforms (Mac OS & Linux):
 ```
-$ curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh
 
-$ bash Miniforge3-$(uname)-$(uname -m).sh
+bash Miniforge3-$(uname)-$(uname -m).sh
 ```
 *Accessed: December 2023
 
@@ -33,23 +33,23 @@ This research was part of the [Moana Project](www.moanaproject.org), therefore t
 
 OpenDrift original repo
 ```
-$ git clone https://github.com/OpenDrift/opendrift.git
+git clone https://github.com/OpenDrift/opendrift.git
 ```
 
 Branch developed by Simon Weppe
 ```
-$ git clone https://github.com/simonweppe/opendrift.git
+git clone https://github.com/simonweppe/opendrift.git
 ```
 
-The [environment.yml](https://github.com/MireyaMMO/cLCS/blob/main/environment.yml) file contains all the dependencies needed to run opendrift.
+The [environment.yml](https://github.com/MireyaMMO/cLCS/blob/main/environment.yml) file contains all the dependencies needed to run opendrift and cLCS scripts.
 ```
-$ cd ../
-$ git clone https://github.com/MireyaMMO/cLCS.git 
-$ cd cLCS
-$ mamba env create --name cLCS --file=environment.yml
-$ pip install --no-deps -e .
-$ cd ../opendrift
-$ pip install --no-deps -e .
+cd ../
+git clone https://github.com/MireyaMMO/cLCS.git 
+cd cLCS
+mamba env create --name cLCS --file=environment.yml
+pip install --no-deps -e .
+cd ../opendrift
+pip install --no-deps -e .
 
 ```
 
@@ -68,6 +68,11 @@ docker pull mmontao/clcs:MOANA-v1.0.0
 OpenDrift
 ```
 docker pull mmontao/clcs:v1.0.0   
+```
+
+And run
+```
+docker run -ti mmontao/clcs:$tag bash
 ```
 
 ## Contents
