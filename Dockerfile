@@ -3,8 +3,10 @@ LABEL Maintainer="mireya.mmor@gmail.com"
 
 RUN apt update && apt install -y libgeos-dev libproj-dev libnetcdf-dev git pip
 
-RUN echo "-----------------Install OpenDrift -----------------" &&\
+RUN echo "-----------------Download OpenDrift -----------------" &&\
     git clone https://github.com/simonweppe/opendrift.git /source/opendrift 
+#    git clone https://github.com/OpenDrift/opendrift.git /source/opendrift 
+
 
 COPY . /source/cLCS
 RUN pip install --upgrade pip 

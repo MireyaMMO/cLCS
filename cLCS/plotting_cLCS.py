@@ -73,6 +73,7 @@ def cLCSrho_cartopy(
     cmap = get_colourmap(colourmap)
     for kk in range(0, nLCS, line_spacing):  # Change 4 for more or less LCSs
         logger.info(f"Plotting squeezeline {kk} from {nLCS}")
+        print(f"Plotting squeezeline {kk}/{nLCS}")
         xs = pxt[kk, :]
         ys = pyt[kk, :]
         xs[np.where(xs < 0)] = 0

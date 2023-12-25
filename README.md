@@ -56,10 +56,16 @@ $ pip install --no-deps -e .
 ## Docker Image
 To build a local docker image:
 ```
-docker build -f Dockerfile -t clcs:latest .
+docker build -f Dockerfile -t clcs:$tag .
 ```
 
 To pull a working docker image from the current repository
+
+Moana Version (developed by Simon Weppe)
+```
+docker pull mmontao/clcs:MOANA-v1.0.0   
+```
+OpenDrift
 ```
 docker pull mmontao/clcs:v1.0.0   
 ```

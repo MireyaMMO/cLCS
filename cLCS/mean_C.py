@@ -9,6 +9,7 @@ import logging
 import logging.config
 import xarray as xr
 import pandas as pd
+import calendar
 
 logging.basicConfig(level=logging.INFO)
 
@@ -226,6 +227,7 @@ class mean_CG(object):
 
     def obtain_final_particle_position(self, o, lon0, lat0, nonanindex):
         self.logger.info("--- Obtaining the final position of particles")
+        print("--- Obtaining the final position of particles")
         lon_OpenDrift = o.history["lon"][:]
         lat_OpenDrift = o.history["lat"][:]
         lon_OpenDrift[np.where(lon_OpenDrift[:] < 0)] = (
@@ -268,6 +270,7 @@ class mean_CG(object):
 
     def calculate_Cauchy_Green(self, end_x, end_y):
         self.logger.info("--- Calculating the Cauchy-Green Tensor")
+        print("--- Calculating Cauchy-Green Tensor")
         dxdy, dxdx = np.gradient(end_x, self.dy0, self.dx0)
         dydy, dydx = np.gradient(end_y, self.dy0, self.dx0)
         dxdx0 = np.reshape(dxdx, (self.Nx0, self.Ny0))
@@ -313,7 +316,7 @@ class mean_CG(object):
             # These lines are repeated as this will generate a deploy for each day allowing us to calculate the Cauchy Green tensors needed for the cLCS calculation
             # Set loglevel to 0 for debug information
             self.logger.info(f"--- {t} Release")
-            print(t)
+            print(f"--- {t} Release {count}/{len(time)-1}")
             o, reader = self.set_opendrift_configuration(self.climatology_file)
             d = "%02d" % t.day
             if self.save_trajectories:
@@ -378,3 +381,4 @@ class mean_CG(object):
             ],
             open(f"{self.new_directory}/TOT-{self.m}.p", "wb"),
         )
+        print(f"Calculation of climatological LCS done for {calendar.month_name[self.month]}")
