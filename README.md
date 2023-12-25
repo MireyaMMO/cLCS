@@ -62,18 +62,24 @@ $ pip install --no-deps -e .
 ### [Examples](https://github.com/MireyaMMO/cLCS/tree/main/examples)
   - [01_cLCS_complete_run.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_complete_run.ipynb) This jupyter notebook displays an example of how to compute the cLCS calculation using the data from the thesis referenced below. 
 ## References
+**cLCS description and matlab toolbox**
+
 [Duran, R., Beron-Vera, F.J. & Olascoaga, M.J. Extracting quasi-steady Lagrangian transport patterns from the ocean circulation: An application to the Gulf of Mexico. Sci Rep 8, 5218 (2018). https://doi.org/10.1038/s41598-018-23121-y](https://www.nature.com/articles/s41598-018-23121-y)
 
 [Duran, R., F. J. Beron-Vera and M. J. Olascoaga (2019). Climatologial Lagrangian Coherent Structures code. DOI: 10.18141/1558781](https://bitbucket.org/rodu/clcss/src/master/)
 
+**OpenDrift**
+
 [Dagestad, K.-F., Rohrs, J., Breivik, O., and Ådlandsvik, B. (2018). OpenDrift v1.0: a generic framework for trajectory modelling. Geoscientific Model Development, 11 (4), 1405–1420.](https://github.com/OpenDrift/opendrift)
 
+**Moana Project - BoP Study**
 
 Montano Orozco, M. M. (2023). Hydrodynamics and coastal dispersion from the Bay of Plenty, Aotearoa, New Zealand: A 25-year numerical modelling perspective (Thesis, Doctor of Philosophy). University of Otago. Retrieved from http://hdl.handle.net/10523/16243. 
 
 [For a better formatted version of the thesis (working embedded links) please click here](https://drive.google.com/file/d/1WMgq2lu7K5MjGTy6O5YpoKDkONDclkHo/view?usp=sharing)
 
 Moana Project [THREDDS](http://thredds.moanaproject.org:6443/thredds/catalog/moana/catalog.html) 
+
 
 ## Additional info
 #### Personalised colourmap options ![Alt text](examples/Colourmap_examples.png)
