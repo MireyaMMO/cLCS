@@ -8,6 +8,8 @@ Climatological Lagrangian Coherent Structure calculation using python based on t
     - [cLCS](#clcs-1)
     - [Examples](#examples)
   - [References](#references)
+  - [Additional info](#additional-info)
+      - [Personalised colourmap options ](#personalised-colourmap-options-)
 
 
 ## Description
@@ -55,6 +57,7 @@ $ pip install --no-deps -e .
   - [mean_C.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/mean_C.py) contains the [mean_CG](https://github.com/MireyaMMO/cLCS/blob/cc9eafca4116e073e67fece8c685dc00c995b066/cLCS/mean_C.py#L23C7-L23C13) class that deploys particles throughout the grid using OpenDrift and computes monthly averages Cauchy-Green tensors for a defined month (See Duran, et al., 2018 for more details on the methods).
   - [make_cLCS.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/make_cLCS.py) contains the class [compute_cLCS_squeezelines](https://github.com/MireyaMMO/cLCS/blob/cc9eafca4116e073e67fece8c685dc00c995b066/cLCS/make_cLCS.py#L7C7-L7C7) which uses the provided Cauchy-Green tensors obtained from mean_CG to compute the squeezelines associated to cLCS. 
   - [plotting.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/plotting.py) using the squeezelines obtained from compute_cLCS_squeezeline plotting can help to visualise the resulting cLCS using cartopy. 
+  - [utils.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/utils.py) contains some utility functions used accross the different classes such as `sp2xy`,  `xy2sph` and `get_colourmap`. The latter contains [personalised colourmap options ](#personalised-colourmap-options-) for a different variety of colourmaps (see Additional info). 
 
 ### [Examples](https://github.com/MireyaMMO/cLCS/tree/main/examples)
   - [01_cLCS_complete_run.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_complete_run.ipynb) This jupyter notebook displays an example of how to compute the cLCS calculation using the data from the thesis referenced below. 
@@ -71,3 +74,6 @@ Montano Orozco, M. M. (2023). Hydrodynamics and coastal dispersion from the Bay 
 [For a better formatted version of the thesis (working embedded links) please click here](https://drive.google.com/file/d/1WMgq2lu7K5MjGTy6O5YpoKDkONDclkHo/view?usp=sharing)
 
 Moana Project [THREDDS](http://thredds.moanaproject.org:6443/thredds/catalog/moana/catalog.html) 
+
+## Additional info
+#### Personalised colourmap options ![Alt text](examples/Colourmap_examples.png)
