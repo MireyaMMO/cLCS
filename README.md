@@ -3,7 +3,8 @@ Climatological Lagrangian Coherent Structure calculation using python based on t
 
 - [cLCS](#clcs)
   - [Description](#description)
-  - [Installation](#installation)
+  - [Conda Installation](#conda-installation)
+  - [Docker Image](#docker-image)
   - [Contents](#contents)
     - [cLCS](#clcs-1)
     - [Examples](#examples)
@@ -16,7 +17,7 @@ Climatological Lagrangian Coherent Structure calculation using python based on t
 This repository contains the scripts needed to deploy a series of particle releases using OpenDrift and calculate the  associated climatological Lagrangian Coherent Structures.
 
 
-## Installation
+## Conda Installation
 To use this package OpenDrift is necessary. To facilitate and make the installation faster please use [mamba](https://github.com/conda-forge/miniforge). 
 Example of how to install on Unix-like platforms (Mac OS & Linux):
 ```
@@ -50,6 +51,17 @@ $ pip install --no-deps -e .
 $ cd ../opendrift
 $ pip install --no-deps -e .
 
+```
+
+## Docker Image
+To build a local docker image:
+```
+docker build -f Dockerfile -t clcs:latest .
+```
+
+To pull a working docker image from the current repository
+```
+docker pull mmontao/clcs:v1.0.0   
 ```
 
 ## Contents
