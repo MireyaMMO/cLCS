@@ -4,7 +4,6 @@ import os
 import setuptools
 
 here = os.path.abspath(os.path.dirname(__file__))
-# exec(open(os.path.join(here)).read())
 
 setuptools.setup(
     name='cLCS',
@@ -12,10 +11,10 @@ setuptools.setup(
     author='Rodrigo Duran adapted to python by Mireya Montano',
     url='https://github.com/MireyaMMO/cLCS',
     download_url='https://github.com/MireyaMMO/cLCS',
-    version=1,
+    version='1.0.0',
     license='',
     packages=['cLCS'],
-    #    long_description=open('README.rst').read(),
+    long_description=open('README.md').read(),
     install_requires=[
         'numpy',
         'scipy',
