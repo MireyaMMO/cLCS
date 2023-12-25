@@ -2,7 +2,10 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from calendar import monthrange
 import pickle
+import logging
+import logging.config
 
+logging.basicConfig(level=logging.INFO)
 
 class compute_cLCS_squeezelines(object):
     """
@@ -21,11 +24,11 @@ class compute_cLCS_squeezelines(object):
         dirr,
         monthvec,
         arclength=500,
-        # def compute_squeeze_lines(self,dirr,monthvec):
     ):
         self.dirr = dirr
         self.monthvec = monthvec
         self.arclength = arclength
+        self.logger = logging
 
     def squeezeline(self, C11, C12, C22, xi, yi, ArcLength):
         """

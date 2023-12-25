@@ -5,7 +5,12 @@ import pickle
 import numpy.ma as ma
 from netCDF4 import Dataset
 from cLCS.utils import *
+import logging
+import logging.config
+import xarray as xr
+import pandas as pd
 
+logging.basicConfig(level=logging.INFO)
 
 def create_seed_times(start, end, delta):
     """
@@ -23,7 +28,8 @@ def create_seed_times(start, end, delta):
 class mean_CG(object):
     """
     mean_C
-    computes sequential Cauchy-Green tensors, and the average for the full period
+    computes sequential Cauchy-Green tensors, and the average for the full period.
+    No vertical motion is considered
 
     Parameters
     ----------
@@ -37,6 +43,8 @@ class mean_CG(object):
         Timescale to use, use negative timescale if a backward in time simulation is needed
     dt: int
         Default 6 hrs
+    frequency_of_deployments: int
+        Default 1 day
     time_step_output: int
         Default 1 day
     opendrift_reader: str
@@ -44,17 +52,27 @@ class mean_CG(object):
     opendrift_model: str
         Module used by opendrift. For the LCS we use OceanDrift (passive particles) however other modules are available (see OpenDrift for more information)
         Default 'OceanDrift'
+
+    Other Parameters:
+    ----------------
+    log_level: int
+        Level of legel wanted for OpenDrift processes, 0 to 100 range.
     vars_dict: dict
         Dictionary containing the names of the variables corresponding to the mask, longitude and latitude (mask_rho, lon_rho, lat_rho for ROMS files)
-
-
+    max_speed: int
+        Maximum speed that can be reached by the particles in m s^{-1}. Default 5.
+    horizontal_diffusivity: int
+        horizontal_diffusivity in m^{2} s^{-1}. Default 0.1
+    advection_scheme: str
+        Advection scheme for the particle releases. Default "runge-kutta4" (see OpenDrift for more options)
+    save_trajectories: boolean
+        Option to save the trajectories obtained from OpenDrift. Default False
+    save_daily_CG = boolean
+        Option to save the Cauchy Green Tensors for each day. Default False
+    
     Returns
     -------
     Output files:
-    Trajectories_%m%d.nc: NetCDF file
-        NetCDF file of the particle trajectories
-    LCS_%m%d_CG.p: pickle File
-        Pickle file containing the Cauchy Green Tensors for each day (C11, C22, C12)
     TOT-%m.p: pickle file
         Pickle file containing the accumulated values for the particle releases deployed for the climatolgical LCS calculation.
             lon, lat : coordinates (degrees)
@@ -62,6 +80,11 @@ class mean_CG(object):
             T: Used timescale
             xspan, yspan: x,y coordinates (km)
             count: number of deploys, important to obtain averages
+    Trajectories_%m%d.nc: NetCDF file (Optional)
+        NetCDF file of the particle trajectories. Default: False
+    LCS_%m%d_CG.p: pickle File  (Optional)
+        Pickle file containing the Cauchy Green Tensors for each day (C11, C22, C12). Default: False
+
     """
 
     def __init__(
@@ -71,31 +94,45 @@ class mean_CG(object):
         month,
         T,
         dt=6,  # six hour time step
-        time_step_output=86400,  # daily output
+        frequency_of_deployments=1,
+        time_step_output=None,  # daily output
         z=0,  # surface
         opendrift_reader="reader_ROMS_native_MOANA",
         opendrift_model="OceanDrift",
+        log_level=20,
         vars_dict={"mask": "mask_rho"},
+        max_speed=5,
+        horizontal_diffusivity=0.1,
+        advection_scheme="runge-kutta4",
+        save_trajectories=False,
+        save_daily_CG = False,
     ):
-        # Import opendrift modules
+        # Environment parameters
         self.dirr = dirr
         self.climatology_file = climatology_file
-        #      self.climatology_file = dirr+filename
         self.month = month
-        self.T = T
-        self.dt = dt
-        self.time_step_output = time_step_output
         if isinstance(self.month, int):
             self.m = "%02d" % self.month
         self.new_directory = os.path.join(self.dirr, self.m)
+        
+        #Particle release parameters
+        self.T = T
+        self.dt = dt
+        self.frequency_of_deployments = frequency_of_deployments
+        self.time_step_output = time_step_output
+
+        # OpenDrift Configuration Parameters
         self.opendrift_reader = opendrift_reader
         self.opendrift_model = opendrift_model
-        exec(f"from opendrift.readers import {self.opendrift_reader}")
-        exec(
-            f"from opendrift.models.{self.opendrift_model.lower()} import {self.opendrift_model}"
-        )
+        self.log_level = log_level
         self.vars_dict = vars_dict
         self.z = z
+        self.max_speed = max_speed
+        self.horizontal_diffusivity = horizontal_diffusivity
+        self.advection_scheme = advection_scheme
+        self.save_trajectories = save_trajectories
+        self.save_daily_CG = save_daily_CG
+        
         # Cauchy-Green terms
         self.lda2total = 0
         self.sqrtlda2total = 0
@@ -103,20 +140,28 @@ class mean_CG(object):
         self.C11total = 0
         self.C22total = 0
         self.C12total = 0
+        
+        # Log information
+        self.logger = logging
 
     def set_directories(self):
         """Create output directories."""
+        self.logger.info("--- Creating output directory")
         if not os.path.isdir(self.new_directory):
             os.makedirs(self.new_directory)
 
     def set_opendrift_configuration(self, file):
-        o = eval(self.opendrift_model)(loglevel=20)
-        reader = eval(self.opendrift_reader)(file)
+        # self.logger.info("--- Setting OpenDrift Configuration")
+        exec(f"from opendrift.readers import {self.opendrift_reader}")
+        exec(
+            f"from opendrift.models.{self.opendrift_model.lower()} import {self.opendrift_model}"
+        )
+        o = eval(self.opendrift_model)(loglevel=self.log_level)
+        reader = eval(self.opendrift_reader).Reader(file)
         # dynamical landmask if true
         o.set_config("general:use_auto_landmask", False)
-        o.max_speed = 5.0
-        o.add_reader(reader)  # This adds the reader
-        # seed
+        o.max_speed = self.max_speed
+        o.add_reader(reader)
         # keep only particles from the "frame" that are on the ocean
         o.set_config("seed:ocean_only", True)
         ###############################
@@ -130,25 +175,28 @@ class mean_CG(object):
 
         # drift
         o.set_config("environment:fallback:land_binary_mask", 0)
-        o.set_config("drift:advection_scheme", "runge-kutta4")  # or 'runge-kutta'
+        o.set_config(
+            "drift:advection_scheme", self.advection_scheme
+        )  # or 'runge-kutta'
         # note current_uncertainty can be used to replicate an horizontal diffusion s
         o.set_config("drift:current_uncertainty", 0.0)
 
-        Kxy = 0.1  # m2/s-1
+        Kxy = self.horizontal_diffusivity  # m2/s-1
         # using new config rather than current uncertainty
         o.set_config("drift:horizontal_diffusivity", Kxy)
 
         o.disable_vertical_motion()
-        o.list_config()
-        o.list_configspec()
+#        o.list_config()
+#        o.list_configspec()
         return o, reader
 
-    def seed_particles_full_grid(self, reader, file):
-        lon = reader.lon
-        lat = reader.lat
-        nc = Dataset(file)
+    def seed_particles_full_grid(self, ds):
+        lonvar = self.vars_dict["lon"]
+        latvar = self.vars_dict["lat"]
         maskvar = self.vars_dict["mask"]
-        mask = nc.variables[maskvar][:]
+        lon = ds[lonvar].values
+        lat = ds[latvar].values
+        mask = ds[maskvar].values
 
         self.lon_origin = np.min(lon)  # [deg]
         self.lat_origin = np.min(lat)  # [deg]
@@ -176,6 +224,7 @@ class mean_CG(object):
         return lon0, lat0, nonanindex
 
     def obtain_final_particle_position(self, o, lon0, lat0, nonanindex):
+        self.logger.info("--- Obtaining the final position of particles")
         lon_OpenDrift = o.history["lon"][:]
         lat_OpenDrift = o.history["lat"][:]
         lon_OpenDrift[np.where(lon_OpenDrift[:] < 0)] = (
@@ -217,6 +266,7 @@ class mean_CG(object):
         return end_x, end_y
 
     def calculate_Cauchy_Green(self, end_x, end_y):
+        self.logger.info("--- Calculating the Cauchy-Green Tensor")
         dxdy, dxdx = np.gradient(end_x, self.dy0, self.dx0)
         dydy, dydx = np.gradient(end_y, self.dy0, self.dx0)
         dxdx0 = np.reshape(dxdx, (self.Nx0, self.Ny0))
@@ -234,38 +284,41 @@ class mean_CG(object):
 
     def run(self):
         self.set_directories()  # creates directory for output
-        o, reader = self.set_opendrift_configuration(self.climatological_file)
-
-        ######################################
-        # Defines the times to run (1 per day)
-        ######################################
+#        _, reader = self.set_opendrift_configuration(self.climatology_file)
+        ds = xr.open_dataset(self.climatology_file)
+        start_time = pd.to_datetime(ds['ocean_time'][0].values)
+        end_time = pd.to_datetime(ds['ocean_time'][-1].values)
+        
         if self.T < 0:
             runtime = [
-                reader.start_time + timedelta(days=int(np.abs(self.T))),
-                reader.end_time + timedelta(days=1),
+                start_time + timedelta(days=int(np.abs(self.T))),
+                end_time + timedelta(days=1),
             ]
         elif self.T > 0:
             runtime = [
-                reader.start_time,
-                reader.end_time - timedelta(days=int(np.abs(self.T))),
+                start_time,
+                end_time - timedelta(days=int(np.abs(self.T))),
             ]
 
-        time = create_seed_times(runtime[0], runtime[1], timedelta(days=1))
+        time = create_seed_times(runtime[0], runtime[1], timedelta(days=self.frequency_of_deployments))
         time_step = timedelta(hours=self.dt)
         duration = timedelta(days=int(np.abs(self.T)))
 
         self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(
-            reader, self.climatological_file
+            ds
         )
 
         for count, t in enumerate(time):
             # These lines are repeated as this will generate a deploy for each day allowing us to calculate the Cauchy Green tensors needed for the cLCS calculation
             # Set loglevel to 0 for debug information
-            o, reader = self.set_opendrift_configuration(
-                self.climatological_file, log_level=self.log_level
-            )
+            self.logger.info(f"--- {t} Release")
+            print(t)
+            o, reader = self.set_opendrift_configuration(self.climatology_file)
             d = "%02d" % t.day
-            namefile = f"{self.new_directory}/Trajectories_{self.m}{d}.nc"
+            if self.save_trajectories:
+                namefile = f"{self.new_directory}/Trajectories_{self.m}{d}.nc"
+            else:
+                namefile = None
             o.seed_elements(
                 self.lon0[nonanindex], self.lat0[nonanindex], time=t, z=self.z
             )
@@ -292,7 +345,7 @@ class mean_CG(object):
 
             end_x, end_y = self.lat_lon_to_x_y(end_lon, end_lat)
 
-            C11, C12, C22, lda2, ftle = self.calculate_cauchy_green(end_x, end_y)
+            C11, C12, C22, lda2, ftle = self.calculate_Cauchy_Green(end_x, end_y)
 
             self.lda2total += lda2
             self.sqrtlda2total += np.sqrt(lda2)
@@ -300,11 +353,12 @@ class mean_CG(object):
             self.C11total += C11
             self.C22total += C22
             self.C12total += C12
-
-            pickle.dump(
-                [C11, C22, C12],
-                open(f"{self.new_directory}/LCS_{self.m}{d}_CG.p", "wb"),
-            )
+            if self.save_daily_CG:  
+                pickle.dump(
+                    [C11, C22, C12],
+                    open(f"{self.new_directory}/LCS_{self.m}{d}_CG.p", "wb"),
+                )
+            del o, reader
         self.count = count
         pickle.dump(
             [

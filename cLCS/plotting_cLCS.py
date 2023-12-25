@@ -5,7 +5,11 @@ from scipy.interpolate import griddata
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cLCS.utils import *
+import os
+import logging
 
+logging.basicConfig(level=logging.INFO)
+logger = logging 
 
 def plot_colourline(x, y, c, cmap, ax=None, transform=None):
     # Plots LCSs using colouredlines to define intensity
@@ -25,7 +29,7 @@ def plot_blacklines(x, y, ax=None, transform=None):
     return
 
 
-def cLCSrho_cartopy(dirr, monthvec, fig=None, ax=None, projection=None):
+def cLCSrho_cartopy(dirr, monthvec, colourmap=None,fig=None, ax=None, projection=None, line_spacing=4):
     # Plots cLCS using cartopy
     # check projection line as the one used is for New Zealand due to the +-180
     if not projection:
@@ -42,9 +46,10 @@ def cLCSrho_cartopy(dirr, monthvec, fig=None, ax=None, projection=None):
         edgecolor="black",
     )
     m = "%02d" % monthvec
-    month_dirr = dirr + m + "/"
+    month_dirr = os.path.join(dirr, m)
+    TOT_CG_path = os.path.join(month_dirr,f"TOT-{m}.p")
     lon, lat, _, sqrtlda2total, _, _, _, _, _, xspan, yspan, count = pickle.load(
-        open(f"{month_dirr}TOT-{m}.p", "rb")
+        open(TOT_CG_path, "rb")
     )
     N = count
     # because the landmask was made NaN and the coast is on the left side
@@ -62,8 +67,9 @@ def cLCSrho_cartopy(dirr, monthvec, fig=None, ax=None, projection=None):
     ax.set_extent(corners, crs=ccrs.PlateCarree())
     z = np.log(sqrtlda2total / N)
     nLCS = pxt.shape[0]
-    cmap = colormap()
-    for kk in range(0, nLCS, 4):  # Change 4 for more or less LCSs
+    cmap = get_colourmap(colourmap)
+    for kk in range(0, nLCS, line_spacing):  # Change 4 for more or less LCSs
+        logger.info(f"Plotting squeezeline {kk} from {nLCS}")
         xs = pxt[kk, :]
         ys = pyt[kk, :]
         xs[np.where(xs < 0)] = 0
@@ -73,3 +79,4 @@ def cLCSrho_cartopy(dirr, monthvec, fig=None, ax=None, projection=None):
         [xS, yS] = xy2sph(xs * 1e3, lonmin, ys * 1e3, latmin)
         zs[np.where(np.isnan(zs))] = 0
         plot_colourline(xS, yS, zs, cmap, transform=ccrs.PlateCarree())
+    return fig

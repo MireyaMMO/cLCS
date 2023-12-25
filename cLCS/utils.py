@@ -1,5 +1,6 @@
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.cm as cm
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 def sph2xy(lambda0,lambda1, theta0, theta1):
     ############# SPH2XY Spherical to curvilinear spherical. ############
@@ -19,10 +20,21 @@ def xy2sph(x, lambda1, y, theta1):
     theta0 = theta1 + y/R / deg2rad
     return lambda0,theta0
 
-
-def colormap():
-  # Colormap used by Rodrigo Duran cLCSs
-    s = np.array([[1.0000,   1.0000,   0.9987, 1],
+def get_colourmap(name):
+    if name=='Zissou':
+        colors = [(.98, .98, .95),(.23, .60, .69), (.47, .71, .77),(.92, .8, .16), (.88,.68,0),(.95,.10,0),(.79,.08,0)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='BlueOrange':
+        top = cm.get_cmap('Oranges', 128) # r means reversed version
+        bottom = cm.get_cmap('Blues_r', 128)# combine it all
+        colors = np.vstack((bottom(np.linspace(0, 1, 128)),
+                               top(np.linspace(0, 1, 128))))# create a new colormaps with a name of OrangeBlue
+        cmap = ListedColormap(colors, name)
+    elif name=='Color_blind_1':
+        colors = [(.67, .34, .11), (.89, .61, .34),(1, .87, .67), (.67,.72,.86),(.30,.45,.71)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='Duran_cLCS':
+        colors = np.array([[1.0000,   1.0000,   0.9987, 1],
                   [0.9971,   1.0000,   0.9970, 1],
                   [0.9896,   1.0000,   0.9931, 1],
                   [0.9771,   1.0000,   0.9871, 1],
@@ -86,5 +98,35 @@ def colormap():
                   [0.7874,        0,        0, 1],
                   [0.6982,        0,        0, 1],
                   [0.6000,   0.0069,    0.0013, 1]])
-    newcmap = LinearSegmentedColormap.from_list('mycmap', s)
-    return newcmap
+        cmap = LinearSegmentedColormap.from_list(name, colors)
+    elif name=='RedYellowBlue':
+        colors = [(.843, .188, .153), (.988, .553, .349),(.996, .878, .565), (.569,.749,.859),(.271,.459,.706)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='BlueYellowRed':
+        colors = [(.843, .188, .153), (.988, .553, .349),(.996, .878, .565), (.569,.749,.859),(.271,.459,.706)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors[::-1], N=200)
+    elif name=='AlgaeSalmon':
+        colors = [(.557, .792, .902), (.165, .616, .561),(.914, .769, .416), (.957,.635,.38),(.906,.435,.318)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='OceanSun':
+        colors = [(.0, .188, .286), (.839, .157, .157),(.969, .498, 0), (.988,.749,.286),(.918,.886,.718)]
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='SunOcean':
+        colors = [(.0, .188, .286), (.839, .157, .157),(.969, .498, 0), (.988,.749,.286),(.918,.886,.718)]
+        cmap = LinearSegmentedColormap.from_list(name, colors[::-1], N=200)
+    elif name=='RedBlue':
+        colors = [(.792, .0, .125), (.957, .647, .511),(.969, .969, .969), (.573,.773,.871),(.024,.439,.690)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='BlueRed':
+        colors = [(.792, .0, .125), (.957, .647, .511),(.969, .969, .969), (.573,.773,.871),(.024,.439,.690)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors[::-1], N=200)
+    elif name=='PurpleOrange':
+        colors = [(.369, .235, .60), (.698, .671, .824),(.969, .969, .969), (.992,.722,.388),(.902,.380,.004)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='SeaLand':
+        colors = [(.004, .522, .443), (.502, .804, .757),(.969, .969, .969), (.875,.761,.490),(.651,.380,.102)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    elif name=='Reds':
+        colors = [(.996, .941, .851), (.992, .800, .541),(.988, .553, .349), (.843,.188,.122)]  # R -> G -> B
+        cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    return cmap
