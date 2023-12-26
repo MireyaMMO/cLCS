@@ -1,40 +1,49 @@
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, LinearNDInterpolator
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cLCS.utils import *
 import os
 import logging
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging
 
 
-def plot_colourline(x, y, c, cmap, ax=None, transform=None):
-    # Plots LCSs using colouredlines to define intensity
+def plot_colourline(x, y, c, cmap, ax=None, lw=0.8):
+    # Plots LCSs using coloured lines to define strength of attraction
     c = cmap((c - 0.4) / (1.4 - 0.4))
     if ax == None:
         ax = plt.gca()
     for i in np.arange(len(x) - 1):
-        ax.plot([x[i], x[i + 1]], [y[i], y[i + 1]], c=c[i], transform=transform, lw=0.8)
+        ax.plot([x[i], x[i + 1]], [y[i], y[i + 1]], c=c[i], lw=lw)
     return
 
 
-def plot_blacklines(x, y, ax=None, transform=None):
+def plot_lines(x, y, ax=None, color="k", alpha="1", lw=0.8):
     # Plots LCSs as black lines
     if ax == None:
         ax = plt.gca()
-    ax.plot(x, y, "k", transform=transform, lw=0.8)
+    ax.plot(x, y, color=color, alpha=alpha, lw=lw)
     return
 
 
-def cLCSrho_cartopy(
-    dirr, monthvec, colourmap=None, fig=None, ax=None, projection=None, line_spacing=4
+def cLCSrho_cartopy_colour(
+    dirr,
+    monthvec,
+    colourmap=None,
+    lw=0.8,
+    fig=None,
+    ax=None,
+    projection=None,
+    line_spacing=4,
+    save_fig=False,
+    corners=None,
 ):
-    # Plots cLCS using cartopy
-    # check projection line as the one used is for New Zealand due to the +-180
+    print(f"---- Generating figure with cartopy features")
     if not projection:
         projection = ccrs.PlateCarree()
     if not fig:
@@ -48,39 +57,113 @@ def cLCSrho_cartopy(
         facecolor=cfeature.COLORS["land"],
         edgecolor="black",
     )
+    print(f"---- High-resolution Cartopy features added")
     m = "%02d" % monthvec
     month_dirr = os.path.join(dirr, m)
     TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
-    lon, lat, _, sqrtlda2total, _, _, _, _, _, xspan, yspan, count = pickle.load(
+    lon, lat, _, sqrtlda2total, _, _, _, _, _, _, _ , count = pickle.load(
         open(TOT_CG_path, "rb")
     )
     N = count
-    # because the landmask was made NaN and the coast is on the left side
-    xi = xspan[-1, :]
-    yi = yspan[:, -1]
-    X0, Y0 = np.meshgrid(xi, yi)
-    X0 = X0.ravel()
-    Y0 = Y0.ravel()
     pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
+    pxt[np.where(pxt < 0)] = np.nan
+    pyt[np.where(pyt < 0)] = np.nan
+    z = np.log(sqrtlda2total / N)
+    z[np.where(np.isnan(z))] = 0
     lonmin = lon.min()
     latmin = lat.min()
     lonmax = lon.max()
     latmax = lat.max()
-    corners = [lonmin, lonmax, latmin, latmax]
-    ax.set_extent(corners, crs=ccrs.PlateCarree())
-    z = np.log(sqrtlda2total / N)
+    lon[np.where(np.isnan(lon))] = 0
+    lat[np.where(np.isnan(lat))] = 0
+    LON0, LAT0, _ = projection.transform_points(ccrs.Geodetic(), lon, lat).T
+    interpolator = LinearNDInterpolator(
+        list(zip(LON0.ravel(), LAT0.ravel())), z.ravel()
+    )
+    Plon, Plat = xy2sph(pxt * 1e3, lonmin, pyt * 1e3, latmin)
+    out_xyz = projection.transform_points(ccrs.Geodetic(), Plon, Plat)
+    out_lon = out_xyz[:, :, 0]
+    out_lat = out_xyz[:, :, 1]
     nLCS = pxt.shape[0]
-    cmap = get_colourmap(colourmap)
-    for kk in range(0, nLCS, line_spacing):  # Change 4 for more or less LCSs
-        logger.info(f"Plotting squeezeline {kk} from {nLCS}")
-        print(f"Plotting squeezeline {kk}/{nLCS}")
-        xs = pxt[kk, :]
-        ys = pyt[kk, :]
-        xs[np.where(xs < 0)] = 0
-        ys[np.where(ys < 0)] = 0
-        z[np.where(np.isnan(z))] = 0
-        zs = griddata((X0.ravel(), Y0.ravel()), z.ravel(), (xs.ravel(), ys.ravel()))
-        [xS, yS] = xy2sph(xs * 1e3, lonmin, ys * 1e3, latmin)
+    if not corners:
+        corners = [lonmin, lonmax, latmin, latmax]
+    ax.set_extent(corners, crs=ccrs.PlateCarree())
+
+    try:
+        cmap = get_colourmap(colourmap)
+    except:
+        logger.warn(
+            "colourmap is not defined on utils trying to obtain colourmap from matplotlib"
+        )
+        cmap = plt.get_cmap(colourmap)
+    print(f"---- Squeezeline and associated data loaded")
+
+    for kk in range(0, nLCS, line_spacing): 
+        xs = out_lon[kk, :]
+        ys = out_lat[kk, :]
+        zs = interpolator(xs, ys)
         zs[np.where(np.isnan(zs))] = 0
-        plot_colourline(xS, yS, zs, cmap, transform=ccrs.PlateCarree())
-    return fig
+        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw)
+    if save_fig:
+        print(f"---- Saving Figure")
+        fig.savefig(f"{month_dirr}/cLCS_{m}.{save_fig}")
+    print(f"---- Done")
+    return fig, ax
+
+
+def cLCSrho_cartopy_monochrome(
+    dirr,
+    monthvec,
+    fig=None,
+    ax=None,
+    color="k",
+    alpha="1",
+    lw=0.8,
+    projection=None,
+    line_spacing=1,
+    save_fig=False,
+    corners=None,
+):
+    print(f"---- Generating figure with cartopy features")
+    if not projection:
+        projection = ccrs.PlateCarree()
+    if not fig:
+        fig = plt.figure(figsize=(8, 6), constrained_layout=True)
+    if not ax:
+        ax = fig.add_subplot(projection=projection)
+    f = cfeature.GSHHSFeature(scale="high", levels=[1])
+    ax.add_geometries(
+        f.geometries(),
+        ccrs.PlateCarree(),
+        facecolor=cfeature.COLORS["land"],
+        edgecolor="black",
+    )
+    print(f"---- High-resolution Cartopy features added")
+    m = "%02d" % monthvec
+    month_dirr = os.path.join(dirr, m)
+    TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
+    lon, lat, _, _, _, _, _, _, _, _, _, _ = pickle.load(open(TOT_CG_path, "rb"))
+    pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
+    pxt[np.where(pxt < 0)] = np.nan
+    pyt[np.where(pyt < 0)] = np.nan
+    lonmin = lon.min()
+    latmin = lat.min()
+    lonmax = lon.max()
+    latmax = lat.max()
+    Plon, Plat = xy2sph(pxt * 1e3, lonmin, pyt * 1e3, latmin)
+    out_xyz = projection.transform_points(ccrs.Geodetic(), Plon, Plat)
+    out_lon = out_xyz[:, :, 0]
+    out_lat = out_xyz[:, :, 1]
+    if not corners:
+        corners = [lonmin, lonmax, latmin, latmax]
+    ax.set_extent(corners, crs=ccrs.PlateCarree())
+    nLCS = pxt.shape[0]
+    for kk in range(0, nLCS, line_spacing):
+        plot_lines(
+            out_lon[kk, :], out_lat[kk, :], ax=ax, color=color, alpha=alpha, lw=lw
+        )
+    if save_fig:
+        print(f"---- Saving Figure")
+        fig.savefig(f"{month_dirr}/cLCS_monochrome_{m}.{save_fig}")
+    print(f"---- Done")   
+    return fig, ax

@@ -3,7 +3,6 @@ import numpy as np
 from datetime import datetime, timedelta
 import pickle
 import numpy.ma as ma
-from netCDF4 import Dataset
 from cLCS.utils import *
 import logging
 import logging.config
@@ -288,7 +287,6 @@ class mean_CG(object):
 
     def run(self):
         self.set_directories()  # creates directory for output
-        #        _, reader = self.set_opendrift_configuration(self.climatology_file)
         ds = xr.open_dataset(self.climatology_file)
         start_time = pd.to_datetime(ds["ocean_time"][0].values)
         end_time = pd.to_datetime(ds["ocean_time"][-1].values)
@@ -312,11 +310,9 @@ class mean_CG(object):
 
         self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(ds)
 
-        for count, t in enumerate(time):
-            # These lines are repeated as this will generate a deploy for each day allowing us to calculate the Cauchy Green tensors needed for the cLCS calculation
-            # Set loglevel to 0 for debug information
+        for count, t in enumerate(time, 1):
             self.logger.info(f"--- {t} Release")
-            print(f"--- {t} Release {count}/{len(time)-1}")
+            print(f"--- {t} Release {count}/{len(time)}")
             o, reader = self.set_opendrift_configuration(self.climatology_file)
             d = "%02d" % t.day
             if self.save_trajectories:
@@ -381,4 +377,6 @@ class mean_CG(object):
             ],
             open(f"{self.new_directory}/TOT-{self.m}.p", "wb"),
         )
-        print(f"Calculation of climatological LCS done for {calendar.month_name[self.month]}")
+        print(
+            f"Calculation of climatological LCS done for {calendar.month_name[self.month]}"
+        )
