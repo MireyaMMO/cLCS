@@ -13,21 +13,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging
 
 
-def plot_colourline(x, y, c, cmap, ax=None, lw=0.8):
+def plot_colourline(x, y, c, cmap, ax=None, lw=0.8, transform=None):
     # Plots LCSs using coloured lines to define strength of attraction
     c = cmap((c - 0.4) / (1.4 - 0.4))
     if ax == None:
         ax = plt.gca()
     for i in np.arange(len(x) - 1):
-        ax.plot([x[i], x[i + 1]], [y[i], y[i + 1]], c=c[i], lw=lw)
+        ax.plot([x[i], x[i + 1]], [y[i], y[i + 1]], c=c[i], lw=lw, transform=transform)
     return
 
 
-def plot_lines(x, y, ax=None, color="k", alpha="1", lw=0.8):
+def plot_lines(x, y, ax=None, color="k", alpha="1", lw=0.8, transform=None):
     # Plots LCSs as black lines
     if ax == None:
         ax = plt.gca()
-    ax.plot(x, y, color=color, alpha=alpha, lw=lw)
+    ax.plot(x, y, color=color, alpha=alpha, lw=lw, transform=transform)
     return
 
 
@@ -69,21 +69,21 @@ def cLCSrho_cartopy_colour(
     pxt[np.where(pxt < 0)] = np.nan
     pyt[np.where(pyt < 0)] = np.nan
     z = np.log(sqrtlda2total / N)
-    z[np.where(np.isnan(z))] = 0
+    #z[np.where(np.isnan(z))] = 0
     lonmin = lon.min()
     latmin = lat.min()
     lonmax = lon.max()
     latmax = lat.max()
-    lon[np.where(np.isnan(lon))] = 0
-    lat[np.where(np.isnan(lat))] = 0
-    LON0, LAT0, _ = projection.transform_points(ccrs.Geodetic(), lon, lat).T
+    #LON0, LAT0, _ = projection.transform_points(ccrs.Geodetic(), lon, lat).T
+    #z[np.where(np.isnan(z))] = 0
+    nonanindex = np.invert(np.isnan(z))
     interpolator = LinearNDInterpolator(
-        list(zip(LON0.ravel(), LAT0.ravel())), z.ravel()
+        list(zip(lon[nonanindex].ravel(), lat[nonanindex].ravel())), z[nonanindex].ravel()
     )
-    Plon, Plat = xy2sph(pxt * 1e3, lonmin, pyt * 1e3, latmin)
-    out_xyz = projection.transform_points(ccrs.Geodetic(), Plon, Plat)
-    out_lon = out_xyz[:, :, 0]
-    out_lat = out_xyz[:, :, 1]
+    Plon, Plat = xy2sph(pxt*1e3, lonmin, pyt*1e3, latmin)
+    #out_xyz = projection.transform_points(ccrs.Geodetic(), Plon, Plat)
+    #out_lon = out_xyz[:, :, 0]
+    #out_lat = out_xyz[:, :, 1]
     nLCS = pxt.shape[0]
     if not corners:
         corners = [lonmin, lonmax, latmin, latmax]
@@ -99,11 +99,11 @@ def cLCSrho_cartopy_colour(
     print(f"---- Squeezeline and associated data loaded")
 
     for kk in range(0, nLCS, line_spacing): 
-        xs = out_lon[kk, :]
-        ys = out_lat[kk, :]
+        xs = Plon[kk, :]
+        ys = Plat[kk, :]
         zs = interpolator(xs, ys)
-        zs[np.where(np.isnan(zs))] = 0
-        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw)
+        #zs[np.where(np.isnan(zs))] = 0
+        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw, transform=ccrs.PlateCarree())
     if save_fig:
         print(f"---- Saving Figure")
         fig.savefig(f"{month_dirr}/cLCS_{m}.{save_fig}")
@@ -150,17 +150,17 @@ def cLCSrho_cartopy_monochrome(
     latmin = lat.min()
     lonmax = lon.max()
     latmax = lat.max()
-    Plon, Plat = xy2sph(pxt * 1e3, lonmin, pyt * 1e3, latmin)
-    out_xyz = projection.transform_points(ccrs.Geodetic(), Plon, Plat)
-    out_lon = out_xyz[:, :, 0]
-    out_lat = out_xyz[:, :, 1]
+    Plon, Plat = xy2sph(pxt*1e3, lonmin, pyt*1e3, latmin)
+    #out_xyz = projection.transform_points(ccrs.Geodetic(), Plon, Plat)
+    #out_lon = out_xyz[:, :, 0]
+    #out_lat = out_xyz[:, :, 1]
     if not corners:
         corners = [lonmin, lonmax, latmin, latmax]
     ax.set_extent(corners, crs=ccrs.PlateCarree())
     nLCS = pxt.shape[0]
     for kk in range(0, nLCS, line_spacing):
         plot_lines(
-            out_lon[kk, :], out_lat[kk, :], ax=ax, color=color, alpha=alpha, lw=lw
+            Plon[kk, :], Plat[kk, :], ax=ax, color=color, alpha=alpha, lw=lw, transform=ccrs.PlateCarree()
         )
     if save_fig:
         print(f"---- Saving Figure")

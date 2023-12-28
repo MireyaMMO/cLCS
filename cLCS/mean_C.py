@@ -93,7 +93,8 @@ class mean_CG(object):
         dirr,
         climatology_file,
         month,
-        T,
+        domain=False,
+        T=-7,
         dt=6,  # six hour time step
         frequency_of_deployments=1,
         time_step_output=None,  # daily output
@@ -115,6 +116,7 @@ class mean_CG(object):
         if isinstance(self.month, int):
             self.m = "%02d" % self.month
         self.new_directory = os.path.join(self.dirr, self.m)
+        self.domain = domain
 
         # Particle release parameters
         self.T = T
@@ -190,19 +192,41 @@ class mean_CG(object):
         #        o.list_config()
         #        o.list_configspec()
         return o, reader
-
-    def seed_particles_full_grid(self, ds):
+    
+    def get_grid_x_y(self,ds):
+        lonvar = self.vars_dict["lon"]
+        latvar = self.vars_dict["lat"]
+        lon = ds[lonvar].values
+        lat = ds[latvar].values    
+        self.lon_origin = np.min(lon)  # [deg]
+        self.lat_origin = np.min(lat)  # [deg]
+        [xspan, yspan] = sph2xy(lon, self.lon_origin, lat, self.lat_origin)
+        if self.domain:
+            self.x =xspan[self.domain[2]:self.domain[3], self.domain[0]:self.domain[1]] * 1e-3
+            self.y =yspan[self.domain[2]:self.domain[3], self.domain[0]:self.domain[1]] * 1e-3
+        else:
+            self.x = xspan * 1e-3  # [km]
+            self.y = yspan * 1e-3  # [km]
+            
+    def seed_particles(self, ds):
         lonvar = self.vars_dict["lon"]
         latvar = self.vars_dict["lat"]
         maskvar = self.vars_dict["mask"]
-        lon = ds[lonvar].values
-        lat = ds[latvar].values
-        mask = ds[maskvar].values
+        if self.domain:
+            londim = self.vars_dict["lon_dim"]
+            latdim = self.vars_dict["lat_dim"]
+            self.lon = ds[lonvar].sel({londim : slice(self.domain[0], self.domain[1]), latdim:slice(self.domain[2], self.domain[3])}).values
+            self.lat = ds[latvar].sel({londim : slice(self.domain[0], self.domain[1]), latdim:slice(self.domain[2], self.domain[3])}).values
+            mask = ds[maskvar].sel({londim : slice(self.domain[0], self.domain[1]), latdim:slice(self.domain[2], self.domain[3])}).values
+        else:
+            self.lon = ds[lonvar].values
+            self.lat = ds[latvar].values
+            mask = ds[maskvar].values
 
-        self.lon_origin = np.min(lon)  # [deg]
-        self.lat_origin = np.min(lat)  # [deg]
+        self.lon_origin = np.min(self.lon)  # [deg]
+        self.lat_origin = np.min(self.lat)  # [deg]
 
-        [xspan, yspan] = sph2xy(lon, self.lon_origin, lat, self.lat_origin)
+        [xspan, yspan] = sph2xy(self.lon, self.lon_origin, self.lat, self.lat_origin)
         self.xspan = xspan * 1e-3  # [km]
         self.yspan = yspan * 1e-3  # [km]
         self.Nx0 = xspan.shape[0]
@@ -290,6 +314,7 @@ class mean_CG(object):
         ds = xr.open_dataset(self.climatology_file)
         start_time = pd.to_datetime(ds["ocean_time"][0].values)
         end_time = pd.to_datetime(ds["ocean_time"][-1].values)
+        self.get_grid_x_y(ds)
 
         if self.T < 0:
             runtime = [
@@ -308,7 +333,7 @@ class mean_CG(object):
         time_step = timedelta(hours=self.dt)
         duration = timedelta(days=int(np.abs(self.T)))
 
-        self.lon0, self.lat0, nonanindex = self.seed_particles_full_grid(ds)
+        self.lon0, self.lat0, nonanindex = self.seed_particles(ds)
 
         for count, t in enumerate(time, 1):
             self.logger.info(f"--- {t} Release")
@@ -361,22 +386,23 @@ class mean_CG(object):
             del o, reader
         self.count = count
         pickle.dump(
-            [
-                self.lon0,
-                self.lat0,
-                self.lda2total,
-                self.sqrtlda2total,
-                self.T,
-                self.ftletotal,
-                self.C11total,
-                self.C22total,
-                self.C12total,
-                self.xspan,
-                self.yspan,
-                self.count,
-            ],
-            open(f"{self.new_directory}/TOT-{self.m}.p", "wb"),
-        )
+                [
+                    self.lon,
+                    self.lat,
+                    self.lda2total,
+                    self.sqrtlda2total,
+                    self.T,
+                    self.ftletotal,
+                    self.C11total,
+                    self.C22total,
+                    self.C12total,
+                    self.x,
+                    self.y,
+                    self.count,
+                ],
+                open(f"{self.new_directory}/TOT-{self.m}.p", "wb"),
+            )
+        
         print(
             f"Calculation of climatological LCS done for {calendar.month_name[self.month]}"
         )
