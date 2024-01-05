@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.cm as cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import matplotlib.pyplot as plt
 
 
 def sph2xy(lambda0, lambda1, theta0, theta1):
@@ -210,4 +211,6 @@ def get_colourmap(name):
             (0.843, 0.188, 0.122),
         ]  # R -> G -> B
         cmap = LinearSegmentedColormap.from_list(name, colors, N=200)
+    else:
+        cmap = plt.get_cmap(name)
     return cmap

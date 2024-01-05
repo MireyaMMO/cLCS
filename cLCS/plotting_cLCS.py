@@ -89,13 +89,7 @@ def cLCSrho_cartopy_colour(
         corners = [lonmin, lonmax, latmin, latmax]
     ax.set_extent(corners, crs=ccrs.PlateCarree())
 
-    try:
-        cmap = get_colourmap(colourmap)
-    except:
-        logger.warn(
-            "colourmap is not defined on utils trying to obtain colourmap from matplotlib"
-        )
-        cmap = plt.get_cmap(colourmap)
+    cmap = get_colourmap(colourmap)
     print(f"---- Squeezeline and associated data loaded")
 
     for kk in range(0, nLCS, line_spacing): 
