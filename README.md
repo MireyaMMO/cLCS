@@ -1,4 +1,5 @@
 # cLCS
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10574263.svg)](https://doi.org/10.5281/zenodo.10574263)
 Climatological Lagrangian Coherent Structure calculation using python based on the code developed by Rodrigo Duran for [Matlab](https://bitbucket.org/rodu/clcss/src/master/). 
 
 - [cLCS](#clcs)
