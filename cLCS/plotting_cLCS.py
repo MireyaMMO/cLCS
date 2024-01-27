@@ -42,6 +42,9 @@ def cLCSrho_cartopy_colour(
     line_spacing=4,
     save_fig=False,
     corners=None,
+    climatology=True,
+    squeezelines_file=None,
+    CG_file=None,
 ):
     print(f"---- Generating figure with cartopy features")
     if not projection:
@@ -60,15 +63,29 @@ def cLCSrho_cartopy_colour(
     print(f"---- High-resolution Cartopy features added")
     m = "%02d" % monthvec
     month_dirr = os.path.join(dirr, m)
-    TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
-    lon, lat, _, sqrtlda2total, _, _, _, _, _, _, _ , count = pickle.load(
-        open(TOT_CG_path, "rb")
-    )
-    N = count
-    pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
-    pxt[np.where(pxt < 0)] = np.nan
-    pyt[np.where(pyt < 0)] = np.nan
-    z = np.log(sqrtlda2total / N)
+    if climatology:
+        TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
+        lon, lat, _, sqrtlda2total, _, _, _, _, _, _, _ , count = pickle.load(
+            open(TOT_CG_path, "rb")
+        )
+        N = count
+        pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
+        pxt[np.where(pxt < 0)] = np.nan
+        pyt[np.where(pyt < 0)] = np.nan
+        z = np.log(sqrtlda2total / N)
+        outfile = f"{month_dirr}/cLCS_{m}"
+    else:
+        try:
+            lon, lat, _, sqrtlda2total, _, _, _, _, _, _, _  = pickle.load(
+            open(CG_file, "rb")
+        )
+            pxt, pyt = pickle.load(open(squeezelines_file, "rb"))
+            pxt[np.where(pxt < 0)] = np.nan
+            pyt[np.where(pyt < 0)] = np.nan
+            z = np.log(sqrtlda2total)
+            outfile = squeezelines_file.split(".")[0]
+        except:
+            print("Path to CG file and squeezelines file must be provided")
     #z[np.where(np.isnan(z))] = 0
     lonmin = lon.min()
     latmin = lat.min()
@@ -100,7 +117,7 @@ def cLCSrho_cartopy_colour(
         plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw, transform=ccrs.PlateCarree())
     if save_fig:
         print(f"---- Saving Figure")
-        fig.savefig(f"{month_dirr}/cLCS_{m}.{save_fig}")
+        fig.savefig(f"{outfile}.{save_fig}")
     print(f"---- Done")
     return fig, ax
 
@@ -117,6 +134,9 @@ def cLCSrho_cartopy_monochrome(
     line_spacing=1,
     save_fig=False,
     corners=None,
+    climatology=True,
+    squeezelines_file=None,
+    CG_file=None,
 ):
     print(f"---- Generating figure with cartopy features")
     if not projection:
@@ -135,9 +155,22 @@ def cLCSrho_cartopy_monochrome(
     print(f"---- High-resolution Cartopy features added")
     m = "%02d" % monthvec
     month_dirr = os.path.join(dirr, m)
-    TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
-    lon, lat, _, _, _, _, _, _, _, _, _, _ = pickle.load(open(TOT_CG_path, "rb"))
-    pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
+    if climatology:
+        TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
+        lon, lat, _, _, _, _, _, _, _, _, _ , _ = pickle.load(
+            open(TOT_CG_path, "rb")
+        )
+        pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
+        outfile = f"{month_dirr}/cLCS_{m}"
+    else:
+        try:
+            lon, lat, _, _, _, _, _, _, _, _, _  = pickle.load(
+            open(CG_file, "rb")
+        )
+            pxt, pyt = pickle.load(open(squeezelines_file, "rb"))
+            outfile = squeezelines_file.split(".")[0]
+        except:
+            print("Path to CG file and squeezelines file must be provided")       
     pxt[np.where(pxt < 0)] = np.nan
     pyt[np.where(pyt < 0)] = np.nan
     lonmin = lon.min()
@@ -158,6 +191,6 @@ def cLCSrho_cartopy_monochrome(
         )
     if save_fig:
         print(f"---- Saving Figure")
-        fig.savefig(f"{month_dirr}/cLCS_monochrome_{m}.{save_fig}")
+        fig.savefig(f"{outfile}_monochrome.{save_fig}")
     print(f"---- Done")   
     return fig, ax

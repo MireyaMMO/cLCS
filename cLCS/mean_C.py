@@ -40,6 +40,10 @@ class mean_CG(object):
         name of the climatological file. Climatological file used here is a ROMS file. Change reader if the file is not ROMS
     month: int
         month that is going to be analysed
+    dx: int
+        Spacing between particles on the x-axis in km. Default grid structure (particle per grid point)
+    dy: int
+        Spacing between particles on the y-axis in km. Default grid structure (particle per grid point)
     T: int
         Timescale to use, use negative timescale if a backward in time simulation is needed
     dt: int
@@ -91,9 +95,11 @@ class mean_CG(object):
     def __init__(
         self,
         dirr,
-        climatology_file,
+        file,
         month,
         domain=False,
+        dx0=None,
+        dy0=None,
         T=-7,
         dt=6,  # six hour time step
         frequency_of_deployments=1,
@@ -108,10 +114,12 @@ class mean_CG(object):
         advection_scheme="runge-kutta4",
         save_trajectories=False,
         save_daily_CG=False,
+        start_releases=None,
+        end_releases=None,
     ):
         # Environment parameters
         self.dirr = dirr
-        self.climatology_file = climatology_file
+        self.file = file
         self.month = month
         if isinstance(self.month, int):
             self.m = "%02d" % self.month
@@ -119,10 +127,14 @@ class mean_CG(object):
         self.domain = domain
 
         # Particle release parameters
+        self.dx0 = dx0
+        self.dy0 = dy0
         self.T = T
         self.dt = dt
         self.frequency_of_deployments = frequency_of_deployments
         self.time_step_output = time_step_output
+        self.start_releases = start_releases
+        self.end_releases = end_releases
 
         # OpenDrift Configuration Parameters
         self.opendrift_reader = opendrift_reader
@@ -153,14 +165,18 @@ class mean_CG(object):
         if not os.path.isdir(self.new_directory):
             os.makedirs(self.new_directory)
 
+    def get_reader(self, file):
+        exec(f"from opendrift.readers import {self.opendrift_reader}")
+        reader = eval(self.opendrift_reader).Reader(file)
+        return reader
+    
     def set_opendrift_configuration(self, file):
         # self.logger.info("--- Setting OpenDrift Configuration")
-        exec(f"from opendrift.readers import {self.opendrift_reader}")
         exec(
             f"from opendrift.models.{self.opendrift_model.lower()} import {self.opendrift_model}"
         )
         o = eval(self.opendrift_model)(loglevel=self.log_level)
-        reader = eval(self.opendrift_reader).Reader(file)
+        reader = self.get_reader(file)
         # dynamical landmask if true
         o.set_config("general:use_auto_landmask", False)
         o.max_speed = self.max_speed
@@ -193,53 +209,64 @@ class mean_CG(object):
         #        o.list_configspec()
         return o, reader
     
-    def get_grid_x_y(self,ds):
+    def get_domain(self, ds, ):
         lonvar = self.vars_dict["lon"]
         latvar = self.vars_dict["lat"]
-        lon = ds[lonvar].values
-        lat = ds[latvar].values    
-        self.lon_origin = np.min(lon)  # [deg]
-        self.lat_origin = np.min(lat)  # [deg]
-        [xspan, yspan] = sph2xy(lon, self.lon_origin, lat, self.lat_origin)
-        if self.domain:
-            self.x =xspan[self.domain[2]:self.domain[3], self.domain[0]:self.domain[1]] * 1e-3
-            self.y =yspan[self.domain[2]:self.domain[3], self.domain[0]:self.domain[1]] * 1e-3
-        else:
-            self.x = xspan * 1e-3  # [km]
-            self.y = yspan * 1e-3  # [km]
-            
+        maskvar = self.vars_dict["mask"]
+        londim = self.vars_dict["lon_dim"]
+        latdim = self.vars_dict["lat_dim"]
+        xi = np.where((np.unique(self.lon)>=self.domain[0]) & (np.unique(self.lon)<=self.domain[1]))[0]
+        yi = np.where((np.unique(self.lat)>=self.domain[2]) & (np.unique(self.lat)<=self.domain[3]))[0]
+        ##Assuming a 2D grid as for roms
+        try:
+            self.lon = ds[lonvar].isel({londim : slice(xi[0], xi[-1]), latdim:slice(yi[0], yi[-1])}).values
+            self.lat = ds[latvar].isel({londim : slice(xi[0], xi[-1]), latdim:slice(yi[0], yi[-1])}).values
+        except:
+            self.lon = ds[lonvar].isel({londim : slice(xi[0], xi[-1])}).values
+            self.lat = ds[latvar].isel({latdim:slice(yi[0], yi[-1])}).values
+        self.mask = ds[maskvar].isel({londim : slice(xi[0], xi[-1]), latdim:slice(yi[0], yi[-1])}).values
+        self.lon_origin = self.lon.min()
+        self.lat_origin = self.lat.min()
+
     def seed_particles(self, ds):
         lonvar = self.vars_dict["lon"]
         latvar = self.vars_dict["lat"]
         maskvar = self.vars_dict["mask"]
+        self.lon = ds[lonvar].values
+        self.lat = ds[latvar].values
+        self.mask = ds[maskvar].values
+        self.lon_origin = self.lon.min()
+        self.lat_origin = self.lat.min()
         if self.domain:
-            londim = self.vars_dict["lon_dim"]
-            latdim = self.vars_dict["lat_dim"]
-            self.lon = ds[lonvar].sel({londim : slice(self.domain[0], self.domain[1]), latdim:slice(self.domain[2], self.domain[3])}).values
-            self.lat = ds[latvar].sel({londim : slice(self.domain[0], self.domain[1]), latdim:slice(self.domain[2], self.domain[3])}).values
-            mask = ds[maskvar].sel({londim : slice(self.domain[0], self.domain[1]), latdim:slice(self.domain[2], self.domain[3])}).values
+            self.get_domain(ds)
+        if self.dx0 and self.dy0:
+            lonmax = self.lon.max()
+            latmax = self.lat.max()
+            xmax, ymax = sph2xy(lonmax, self.lon_origin, latmax, self.lat_origin)
+            x = np.arange(0, xmax*1e-3, self.dx0)
+            y = np.arange(0, ymax*1e-3, self.dy0)
+            self.xspan, self.yspan = np.meshgrid(x,y)
+            lon, lat = xy2sph(self.xspan*1e3, self.lon_origin, self.yspan*1e3, self.lat_origin)
+            from scipy.interpolate import griddata
+            self.mask = griddata((self.lon.ravel(),self.lat.ravel()), self.mask.ravel(), (lon.ravel(), lat.ravel()), method='nearest').reshape(lon.shape)
+            self.lon = lon
+            self.lat = lat
         else:
-            self.lon = ds[lonvar].values
-            self.lat = ds[latvar].values
-            mask = ds[maskvar].values
-
-        self.lon_origin = np.min(self.lon)  # [deg]
-        self.lat_origin = np.min(self.lat)  # [deg]
-
-        [xspan, yspan] = sph2xy(self.lon, self.lon_origin, self.lat, self.lat_origin)
-        self.xspan = xspan * 1e-3  # [km]
-        self.yspan = yspan * 1e-3  # [km]
-        self.Nx0 = xspan.shape[0]
-        self.Ny0 = yspan.shape[1]
+            [xspan, yspan] = sph2xy(self.lon, self.lon_origin, self.lat, self.lat_origin)
+            self.xspan = xspan * 1e-3  # [km]
+            self.yspan = yspan * 1e-3  # [km]
+            self.dx0 = np.nanmean(np.diff(self.xspan, axis=1))
+            self.dy0 = np.nanmean(np.diff(self.yspan, axis=0))
+        self.x = np.copy(self.xspan)
+        self.y = np.copy(self.yspan)
+        self.Nx0 = self.xspan.shape[0]
+        self.Ny0 = self.yspan.shape[1]
         Nxy0 = self.Nx0 * self.Ny0
-        self.dx0 = np.nanmean(np.diff(self.xspan, axis=1))
-        self.dy0 = np.nanmean(np.diff(self.yspan, axis=0))
-
         X0 = self.xspan.ravel()
         Y0 = self.yspan.ravel()
         # mask the land points from the beginning using mask_rho from roms
-        X0[np.where(mask.ravel() == 0)] = np.nan
-        Y0[np.where(mask.ravel() == 0)] = np.nan
+        X0[np.where(self.mask.ravel() == 0)] = np.nan
+        Y0[np.where(self.mask.ravel() == 0)] = np.nan
 
         lon0, lat0 = xy2sph(X0 * 1e3, self.lon_origin, Y0 * 1e3, self.lat_origin)
 
@@ -311,11 +338,16 @@ class mean_CG(object):
 
     def run(self):
         self.set_directories()  # creates directory for output
-        ds = xr.open_dataset(self.climatology_file)
-        start_time = pd.to_datetime(ds["ocean_time"][0].values)
-        end_time = pd.to_datetime(ds["ocean_time"][-1].values)
-        self.get_grid_x_y(ds)
-
+        ds = xr.open_dataset(self.file)
+        if not self.start_releases:
+            start_time = pd.to_datetime(ds["ocean_time"][0].values)
+        else:
+            start_time = self.start_releases
+        if not self.end_releases:
+            end_time = pd.to_datetime(ds["ocean_time"][-1].values)
+        else:
+            end_time = self.end_releases
+            
         if self.T < 0:
             runtime = [
                 start_time + timedelta(days=int(np.abs(self.T))),
@@ -333,12 +365,12 @@ class mean_CG(object):
         time_step = timedelta(hours=self.dt)
         duration = timedelta(days=int(np.abs(self.T)))
 
+        reader = self.get_reader(self.file)
         self.lon0, self.lat0, nonanindex = self.seed_particles(ds)
-
         for count, t in enumerate(time, 1):
             self.logger.info(f"--- {t} Release")
             print(f"--- {t} Release {count}/{len(time)}")
-            o, reader = self.set_opendrift_configuration(self.climatology_file)
+            o, reader = self.set_opendrift_configuration(self.file)
             d = "%02d" % t.day
             if self.save_trajectories:
                 namefile = f"{self.new_directory}/Trajectories_{self.m}{d}.nc"
@@ -380,8 +412,8 @@ class mean_CG(object):
             self.C12total += C12
             if self.save_daily_CG:
                 pickle.dump(
-                    [C11, C22, C12],
-                    open(f"{self.new_directory}/LCS_{self.m}{d}_CG.p", "wb"),
+                    [self.lon, self.lat, lda2, np.sqrt(lda2), self.T, ftle, C11, C22, C12, self.x, self.y],
+                    open(f"{self.new_directory}/LCS_{self.m}{d}-CG.p", "wb"),
                 )
             del o, reader
         self.count = count

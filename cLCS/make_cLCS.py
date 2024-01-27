@@ -2,6 +2,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from calendar import monthrange
 import pickle
+import glob
 import logging
 import logging.config
 
@@ -27,12 +28,14 @@ class compute_cLCS_squeezelines(object):
         arclength=500,
         nxb=25,
         nyb=25,
+        climatology=True,
     ):
         self.dirr = dirr
         self.monthvec = monthvec
         self.arclength = arclength
         self.nxb = nxb
         self.nyb = nyb
+        self.climatology= climatology
         self.logger = logging
 
     def squeezeline(self, C11, C12, C22, xi, yi, ArcLength):
@@ -227,26 +230,50 @@ class compute_cLCS_squeezelines(object):
     def run(self):
         m = "%02d" % self.monthvec
         month_dirr = self.dirr + m + "/"
-        (
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                C11total,
-                C22total,
-                C12total,
-                xspan,
-                yspan,
-                count,
-        ) = pickle.load(open(f"{month_dirr}TOT-{m}.p", "rb"))
-        N = count
-        C11 = C11total / N
-        C22 = C22total / N
-        C12 = C12total / N
-        ArcLength = self.arclength
-        self.pxt, self.pyt = self.squeezeline(
-            C11, C12, C22, xspan[-1, :], yspan[:, -1], [0, ArcLength]
-        )
-        pickle.dump([self.pxt, self.pyt], open(f"{month_dirr}/cLCS_{m}.p", "wb"))
+        if self.climatology:
+            (
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    C11total,
+                    C22total,
+                    C12total,
+                    xspan,
+                    yspan,
+                    count,
+            ) = pickle.load(open(f"{month_dirr}TOT-{m}.p", "rb"))
+            N = count
+            C11 = C11total / N
+            C22 = C22total / N
+            C12 = C12total / N
+            ArcLength = self.arclength
+            self.pxt, self.pyt = self.squeezeline(
+                    C11, C12, C22, xspan[-1, :], yspan[:, -1], [0, ArcLength]
+            )
+            pickle.dump([self.pxt, self.pyt], open(f"{month_dirr}/cLCS_{m}.p", "wb"))
+
+        else: 
+            LCS_files = sorted(glob.glob(f"{month_dirr}/LCS_{m}*-CG.p"))
+            for file in LCS_files:
+                outfile = file.split('-')[0]
+                (
+                            _,
+                            _,
+                            _,
+                            _,
+                            _,
+                            _,
+                            C11,
+                            C22,
+                            C12,
+                            xspan,
+                            yspan,
+                    ) = pickle.load(open(file, "rb"))
+                ArcLength = self.arclength
+                self.pxt, self.pyt = self.squeezeline(
+                        C11, C12, C22, xspan[-1, :], yspan[:, -1], [0, ArcLength]
+                )
+                pickle.dump([self.pxt, self.pyt], open(f"{outfile}.p", "wb"))
