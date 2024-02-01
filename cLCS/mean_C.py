@@ -231,10 +231,10 @@ class mean_CG(object):
     def seed_particles(self, ds):
         lonvar = self.vars_dict["lon"]
         latvar = self.vars_dict["lat"]
-        maskvar = self.vars_dict["mask"]
+        # maskvar = self.vars_dict["mask"]
         self.lon = ds[lonvar].values
         self.lat = ds[latvar].values
-        self.mask = ds[maskvar].values
+        # self.mask = ds[maskvar].values
         self.lon_origin = self.lon.min()
         self.lat_origin = self.lat.min()
         if self.domain:
@@ -273,7 +273,51 @@ class mean_CG(object):
         lon0 = ma.masked_where(np.isnan(lon0), lon0)
         lat0 = ma.masked_where(np.isnan(lat0), lat0)
         nonanindex = np.invert(np.isnan(lon0))  # non-land particles
+
         return lon0, lat0, nonanindex
+
+    def seed_particles_schism(self, ds):
+
+        self.lon = ds[self.vars_dict["lon"]].values
+        self.lat = ds[self.vars_dict["lat"]].values   
+
+        self.lon_origin = self.domain[0]
+        self.lat_origin = self.domain[-1]
+        lonmax = self.domain[1]
+        latmax = self.domain[2]
+
+        xmax, ymax = sph2xy(lonmax, self.lon_origin, latmax, self.lat_origin)
+        x = np.arange(0, xmax*1e-3, self.dx0)
+        y = np.arange(0, ymax*1e-3, self.dy0)
+        self.xspan, self.yspan = np.meshgrid(x,y)
+        self.lon, self.lat = xy2sph(self.xspan*1e3, self.lon_origin, self.yspan*1e3, self.lat_origin)
+
+        self.x = np.copy(self.xspan)
+        self.y = np.copy(self.yspan)
+        self.Nx0 = self.xspan.shape[0]
+        self.Ny0 = self.yspan.shape[1]
+        Nxy0 = self.Nx0 * self.Ny0
+        X0 = self.xspan.ravel()
+        Y0 = self.yspan.ravel()
+
+        ## TODO: 
+        ## GET LAND INDECES (AS IN "nonnanindex") BASED ON GRID POINTS THAT
+        ## FALL OUT OF SCHISM MESH POLYGON. TO DO THIS I WILL NEED TO INSTALL
+        ## SCHISM-TOOLS PACKAGE SO WE CAN LEVERAGE SOME TOOLS FOR HANDLING
+        ## SCHISM UNSTRUCTURED MESH AND SOME POLYGON OPERATIONS
+
+        ## mask the land points from the beginning using mask_rho from roms
+        # X0[np.where(self.mask.ravel() == 0)] = np.nan
+        # Y0[np.where(self.mask.ravel() == 0)] = np.nan
+
+        lon0, lat0 = xy2sph(X0 * 1e3, self.lon_origin, Y0 * 1e3, self.lat_origin)
+
+        # lon0 = ma.masked_where(np.isnan(lon0), lon0)
+        # lat0 = ma.masked_where(np.isnan(lat0), lat0)
+        # nonanindex = np.invert(np.isnan(lon0))  # non-land particles
+        
+        # return lon0, lat0, nonanindex
+        return lon0, lat0
 
     def obtain_final_particle_position(self, o, lon0, lat0, nonanindex):
         self.logger.info("--- Obtaining the final position of particles")
@@ -310,6 +354,46 @@ class mean_CG(object):
             end_lat[nonanindex] = lat[::-1]
         return end_lon, end_lat
 
+    def obtain_final_particle_position_schism(self, o, lon0, lat0):
+        '''
+        NOTE: THIS IS A COPY/PASTE FROM "obtain_final_particle_position" ABOVE,
+        ONLY DIFFERENCE IS THAT '[nonanindex]' INDEXATION ISN'T USED HERE.
+        '''
+
+        self.logger.info("--- Obtaining the final position of particles")
+        print("--- Obtaining the final position of particles")
+        lon_OpenDrift = o.history["lon"][:]
+        lat_OpenDrift = o.history["lat"][:]
+        lon_OpenDrift[np.where(lon_OpenDrift[:] < 0)] = (
+            lon_OpenDrift[np.where(o.history["lon"] < 0)][:] + 360
+        )
+        end_lat = np.zeros(lat0.shape)
+        end_lon = np.zeros(lon0.shape)
+        end_lat[np.where(end_lat == 0)] = np.nan
+        end_lon[np.where(end_lon == 0)] = np.nan
+        lon = np.zeros(lon_OpenDrift.shape[0])
+        lat = np.zeros(lat_OpenDrift.shape[0])
+        # If particle is stranded use last location
+        for k in range(lon_OpenDrift.shape[0]):
+            notmask = np.where(lon_OpenDrift[k, :].mask == False)[0]
+            lon[k] = lon_OpenDrift[k, notmask][-1]
+            lat[k] = lat_OpenDrift[k, notmask][-1]
+        if self.T > 0:
+            end_lon = lon
+            end_lon[np.where(end_lon[:] < 0)] = (
+                end_lon[np.where(end_lon[:] < 0)][:] + 360
+            )
+            end_lat = lat
+        elif (
+            self.T < 0
+        ):  # Opendrift does something that when run backwards it inverts the order
+            end_lon = lon[::-1]
+            end_lon[np.where(end_lon[:] < 0)] = (
+                end_lon[np.where(end_lon[:] < 0)][:] + 360
+            )
+            end_lat = lat[::-1]
+        return end_lon, end_lat
+
     def lat_lon_to_x_y(self, end_lon, end_lat):
         [end_x, end_y] = sph2xy(end_lon, self.lon_origin, end_lat, self.lat_origin)
         end_x = end_x * 1e-3
@@ -340,11 +424,11 @@ class mean_CG(object):
         self.set_directories()  # creates directory for output
         ds = xr.open_dataset(self.file)
         if not self.start_releases:
-            start_time = pd.to_datetime(ds["ocean_time"][0].values)
+            start_time = pd.to_datetime(ds[self.vars_dict["time"]][0].values)
         else:
             start_time = self.start_releases
         if not self.end_releases:
-            end_time = pd.to_datetime(ds["ocean_time"][-1].values)
+            end_time = pd.to_datetime(ds[self.vars_dict["time"]][-1].values)
         else:
             end_time = self.end_releases
             
@@ -366,7 +450,13 @@ class mean_CG(object):
         duration = timedelta(days=int(np.abs(self.T)))
 
         reader = self.get_reader(self.file)
-        self.lon0, self.lat0, nonanindex = self.seed_particles(ds)
+        
+
+        ## NOTE: USING SCHISM SPECIFIC METHODS ---------------------------------------------------
+        # self.lon0, self.lat0, nonanindex = self.seed_particles(ds) ## NOTE: WORKS ONLY FOR ROMS
+        self.lon0, self.lat0 = self.seed_particles_schism(ds)
+        ## ---------------------------------------------------------------------------------------
+
         for count, t in enumerate(time, 1):
             self.logger.info(f"--- {t} Release")
             print(f"--- {t} Release {count}/{len(time)}")
@@ -376,9 +466,12 @@ class mean_CG(object):
                 namefile = f"{self.new_directory}/Trajectories_{self.m}{d}.nc"
             else:
                 namefile = None
-            o.seed_elements(
-                self.lon0[nonanindex], self.lat0[nonanindex], time=t, z=self.z
-            )
+            
+            ## NOTE: USING SCHISM SPECIFIC METHODS -----------------------------------------------------------------------
+            # o.seed_elements(self.lon0[nonanindex], self.lat0[nonanindex], time=t, z=self.z) ## NOTE: WORKS ONLY FOR ROMS
+            o.seed_elements(self.lon0, self.lat0, time=t, z=self.z)
+            ## -----------------------------------------------------------------------------------------------------------
+
             # Foward in time
             if self.T > 0:
                 o.run(
@@ -396,10 +489,11 @@ class mean_CG(object):
                     outfile=namefile,
                 )
 
-            end_lon, end_lat = self.obtain_final_particle_position(
-                o, self.lon0, self.lat0, nonanindex
-            )
-
+            ## NOTE: USING SCHISM SPECIFIC METHODS -----------------------------------------------------------------------------------
+            # end_lon, end_lat = self.obtain_final_particle_position(o, self.lon0, self.lat0, nonanindex) ## NOTE: WORKS ONLY FOR ROMS
+            end_lon, end_lat = self.obtain_final_particle_position_schism(o, self.lon0, self.lat0)
+            ## -----------------------------------------------------------------------------------------------------------------------
+            
             end_x, end_y = self.lat_lon_to_x_y(end_lon, end_lat)
 
             C11, C12, C22, lda2, ftle = self.calculate_Cauchy_Green(end_x, end_y)
