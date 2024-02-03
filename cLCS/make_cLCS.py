@@ -17,21 +17,21 @@ class compute_cLCS_squeezelines(object):
     -----------
     dirr: str
       directory where the climatological files are located, same dirr as used in mean_C
-    monthvec: str
-      month to be analysed
+    month_or_id: str
+      month to be analysed or id
     """
 
     def __init__(
         self,
         dirr,
-        monthvec,
+        month_or_id,
         arclength=500,
         nxb=25,
         nyb=25,
         climatology=True,
     ):
         self.dirr = dirr
-        self.monthvec = monthvec
+        self.month_or_id = month_or_id
         self.arclength = arclength
         self.nxb = nxb
         self.nyb = nyb
@@ -228,8 +228,10 @@ class compute_cLCS_squeezelines(object):
         return [rr, cc]
 
     def run(self):
-        m = "%02d" % self.monthvec
-        month_dirr = self.dirr + m + "/"
+        if isinstance(self.month_or_id, int):
+            self.month_or_id = "%02d" % self.month_or_id
+    
+        month_dirr = self.dirr + self.month_or_id + "/"
         if self.climatology:
             (
                     _,
@@ -244,7 +246,7 @@ class compute_cLCS_squeezelines(object):
                     xspan,
                     yspan,
                     count,
-            ) = pickle.load(open(f"{month_dirr}TOT-{m}.p", "rb"))
+            ) = pickle.load(open(f"{month_dirr}TOT-{self.month_or_id}.p", "rb"))
             N = count
             C11 = C11total / N
             C22 = C22total / N
@@ -253,10 +255,13 @@ class compute_cLCS_squeezelines(object):
             self.pxt, self.pyt = self.squeezeline(
                     C11, C12, C22, xspan[-1, :], yspan[:, -1], [0, ArcLength]
             )
-            pickle.dump([self.pxt, self.pyt], open(f"{month_dirr}/cLCS_{m}.p", "wb"))
+            zeros = np.where((np.diff(self.pxt,1)[:,0]==0) | (np.diff(self.pyt,1)[:,0]==0))[0]
+            self.pxt = np.delete(self.pxt, zeros, 0)
+            self.pyt = np.delete(self.pyt, zeros, 0)
+            pickle.dump([self.pxt, self.pyt], open(f"{month_dirr}/cLCS_{self.month_or_id}.p", "wb"))
 
         else: 
-            LCS_files = sorted(glob.glob(f"{month_dirr}/LCS_{m}*-CG.p"))
+            LCS_files = sorted(glob.glob(f"{month_dirr}/LCS_{self.month_or_id}*-CG.p"))
             for file in LCS_files:
                 outfile = file.split('-')[0]
                 (
@@ -276,4 +281,7 @@ class compute_cLCS_squeezelines(object):
                 self.pxt, self.pyt = self.squeezeline(
                         C11, C12, C22, xspan[-1, :], yspan[:, -1], [0, ArcLength]
                 )
+                zeros = np.where(np.diff(self.pxt,1)[:,0]==0)[0]
+                self.pxt = np.delete(self.pxt, zeros, 0)
+                self.pyt = np.delete(self.pyt, zeros, 0)
                 pickle.dump([self.pxt, self.pyt], open(f"{outfile}.p", "wb"))
