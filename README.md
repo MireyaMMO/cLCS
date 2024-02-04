@@ -48,9 +48,9 @@ cd ../
 git clone https://github.com/MireyaMMO/cLCS.git 
 cd cLCS
 mamba env create --name cLCS --file=environment.yml
-pip install --no-deps -e .
+pip install -e .
 cd ../opendrift
-pip install --no-deps -e .
+pip install -e .
 ```
 
 ## Docker Image

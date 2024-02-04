@@ -116,6 +116,9 @@ class mean_CG(object):
         save_trajectories=False,
         save_daily_CG=False,
         start_release=None,
+        stokes_add=None,
+        stokes_files=None,
+        stokes_reader=None,
     ):
         # Environment parameters
         self.dirr = dirr
@@ -149,6 +152,11 @@ class mean_CG(object):
         self.save_trajectories = save_trajectories
         self.save_daily_CG = save_daily_CG
 
+        # Stokes addition
+        self.stokes_add = stokes_add
+        self.stokes_files = stokes_files
+        self.stokes_reader = stokes_reader
+        
         # Cauchy-Green terms
         self.lda2total = 0
         self.sqrtlda2total = 0
@@ -180,12 +188,19 @@ class mean_CG(object):
         
         o.set_config("general:use_auto_landmask", False)
         o.max_speed = self.max_speed
+
         if 'schism' in self.opendrift_reader:
             from opendrift.readers import reader_global_landmask
             reader_landmask = reader_global_landmask.Reader()
+            
+            if self.stokes_add:
+                self.add_stokes_schism()
+                
             o.add_reader([self.reader, reader_landmask])
+            o.set_config('general:coastline_action', 'previous')
         else:
-            o.add_reader(self.reader)
+            o.add_reader(self.reader)       
+            
         o.set_config("seed:ocean_only", False) #Particles set on land not moved to ocean
         
         ###############################
@@ -212,11 +227,56 @@ class mean_CG(object):
         o.disable_vertical_motion()
         #        o.list_config()
         #        o.list_configspec()
+
         return o
 
-    # def get_mask(self,ds, type):
-    #     maskvar = self.variable_mapping["land_binary_mask"]
-    #     self.mask = ds[maskvar].values
+    def add_stokes_schism(self):
+        exec(f"from opendrift.readers import {self.stokes_reader}")
+        stokes = eval(self.stokes_reader).Reader(
+            filename = self.stokes_files
+        )
+        ## velocity component indeces
+        uidx, vidx = 0, 1
+        
+        ## load stokes velocities
+        x_stokes = stokes.dataset['STOKESBAROX'].values
+        y_stokes = stokes.dataset['STOKESBAROY'].values
+
+        ## combined or stokes-only
+        if self.stokes_add == 'only':
+            u_new = x_stokes
+            v_new = y_stokes
+        elif self.stokes_add == 'add':
+            # load current velocities
+            u_vel = self.reader.dataset['dahv'][:,:,uidx].values
+            v_vel = self.reader.dataset['dahv'][:,:,vidx].values
+            # add
+            u_new = u_vel + x_stokes
+            v_new = v_vel + y_stokes
+
+        ## remove current dataset from reader object
+        dahv = self.reader.dataset['dahv'].copy()
+        ds_new = self.reader.dataset.drop(['dahv'])
+        self.reader.__dict__['dataset'] = None
+        
+        ## create new datarray
+        dims = (ds_new.dims['time'], ds_new.dims['nSCHISM_hgrid_node'], ds_new.dims['two'])
+        dims_keys = ['time', 'nSCHISM_hgrid_node', 'two']
+        arr = np.ones(shape=dims)
+        arr[:,:,uidx] = u_new
+        arr[:,:,vidx] = v_new
+        ds_new['dahv'] = xr.DataArray(
+            data=arr, 
+            dims=dims_keys, 
+            coords=dict(
+                time=ds_new.time.values,
+                nSCHISM_hgrid_node = ds_new['nSCHISM_hgrid_node'].values,
+                two = ds_new['two'].values
+            ), 
+            attrs=dahv.attrs
+        )
+        ## assign new dataset to reader object
+        self.reader.__dict__['dataset'] = ds_new
 
     def seed_particles(self, ds):
         if self.domain:
