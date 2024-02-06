@@ -48,9 +48,9 @@ cd ../
 git clone https://github.com/MireyaMMO/cLCS.git 
 cd cLCS
 mamba env create --name cLCS --file=environment.yml
-pip install --no-deps -e .
+pip install -e .
 cd ../opendrift
-pip install --no-deps -e .
+pip install -e .
 ```
 
 ## Docker Image
@@ -83,7 +83,10 @@ docker run -ti mmontao/clcs:$tag bash
   - [utils.py](https://github.com/MireyaMMO/cLCS/blob/main/cLCS/utils.py) contains some utility functions used accross the different classes such as `sp2xy`,  `xy2sph` and `get_colourmap`. The latter contains [personalised colourmap options ](#personalised-colourmap-options-) for a different variety of colourmaps (see Additional info). 
 
 ### [Examples](https://github.com/MireyaMMO/cLCS/tree/main/examples)
-  - [01_cLCS_complete_run.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_complete_run.ipynb) This jupyter notebook displays an example of how to compute the cLCS calculation using the data from the thesis referenced below. 
+  - [01_cLCS_ROMS.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_ROMS.ipynb) This jupyter notebook displays an example of how to compute the cLCS calculation using the data from the thesis referenced below. 
+  - [02_LCS_SCHISM.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/02_LCS_SCHISM.ipynb) This jupyter notebook displays an example of how to compute the LCS calculation using an unstructured-hydrodynamic model (SCHISM) and a wave model. 
+  - [03_LCS_SCHISM_stokes_only.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/02_LCS_SCHISM_stokes_only.ipynb) This jupyter notebook displays an example of how to compute the LCS calculation only considering stokes drift. 
+
 ## References
 **cLCS description and matlab toolbox**
 

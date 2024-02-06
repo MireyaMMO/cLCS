@@ -22,11 +22,7 @@ setuptools.setup(
         'netCDF4',
         'pyproj',
         'cartopy',
-        'opendrift-landmask-data'
-        'calendar'
-        'opendrift'
-        'pickle'
-        'datetime'
+        'datetime',
     ],
     include_package_data=True
 )

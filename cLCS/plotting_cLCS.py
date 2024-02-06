@@ -13,9 +13,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging
 
 
-def plot_colourline(x, y, c, cmap, ax=None, lw=0.8, transform=None):
+def plot_colourline(x, y, c, cmap, ax=None, lw=0.8, transform=None, climatology=None):
     # Plots LCSs using coloured lines to define strength of attraction
-    c = cmap((c - 0.4) / (1.4 - 0.4))
+    if climatology:
+        c = cmap((c - 0.4) / (1.4 - 0.4))
+    else:
+        c = cmap((c - 0.4) / (3.0 - 0.4))
     if ax == None:
         ax = plt.gca()
     for i in np.arange(len(x) - 1):
@@ -33,7 +36,7 @@ def plot_lines(x, y, ax=None, color="k", alpha="1", lw=0.8, transform=None):
 
 def cLCSrho_cartopy_colour(
     dirr,
-    monthvec,
+    month_or_id,
     colourmap=None,
     lw=0.8,
     fig=None,
@@ -45,6 +48,7 @@ def cLCSrho_cartopy_colour(
     climatology=True,
     squeezelines_file=None,
     CG_file=None,
+    LCS_strength=None,
 ):
     print(f"---- Generating figure with cartopy features")
     if not projection:
@@ -61,19 +65,22 @@ def cLCSrho_cartopy_colour(
         edgecolor="black",
     )
     print(f"---- High-resolution Cartopy features added")
-    m = "%02d" % monthvec
-    month_dirr = os.path.join(dirr, m)
+    if isinstance(month_or_id, int):
+            month_or_id = "%02d" % month_or_id
+            
+    month_dirr = os.path.join(dirr, month_or_id)
     if climatology:
-        TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
+        TOT_CG_path = os.path.join(month_dirr, f"TOT-{month_or_id}.p")
         lon, lat, _, sqrtlda2total, _, _, _, _, _, _, _ , count = pickle.load(
             open(TOT_CG_path, "rb")
         )
         N = count
-        pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
+        pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{month_or_id}.p", "rb"))
         pxt[np.where(pxt < 0)] = np.nan
         pyt[np.where(pyt < 0)] = np.nan
         z = np.log(sqrtlda2total / N)
-        outfile = f"{month_dirr}/cLCS_{m}"
+        z[np.where(z>3)]=np.nan
+        outfile = f"{month_dirr}/cLCS_{month_or_id}"
     else:
         try:
             lon, lat, _, sqrtlda2total, _, _, _, _, _, _, _  = pickle.load(
@@ -83,6 +90,7 @@ def cLCSrho_cartopy_colour(
             pxt[np.where(pxt < 0)] = np.nan
             pyt[np.where(pyt < 0)] = np.nan
             z = np.log(sqrtlda2total)
+            #z[np.where(z>10)]=np.nan
             outfile = squeezelines_file.split(".")[0]
         except:
             print("Path to CG file and squeezelines file must be provided")
@@ -108,13 +116,14 @@ def cLCSrho_cartopy_colour(
 
     cmap = get_colourmap(colourmap)
     print(f"---- Squeezeline and associated data loaded")
-
+    if LCS_strength=='weak':
+        climatology=True
     for kk in range(0, nLCS, line_spacing): 
         xs = Plon[kk, :]
         ys = Plat[kk, :]
         zs = interpolator(xs, ys)
         #zs[np.where(np.isnan(zs))] = 0
-        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw, transform=ccrs.PlateCarree())
+        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw, transform=ccrs.PlateCarree(), climatology=climatology)
     if save_fig:
         print(f"---- Saving Figure")
         fig.savefig(f"{outfile}.{save_fig}")
@@ -124,7 +133,7 @@ def cLCSrho_cartopy_colour(
 
 def cLCSrho_cartopy_monochrome(
     dirr,
-    monthvec,
+    month_or_id,
     fig=None,
     ax=None,
     color="k",
@@ -153,15 +162,16 @@ def cLCSrho_cartopy_monochrome(
         edgecolor="black",
     )
     print(f"---- High-resolution Cartopy features added")
-    m = "%02d" % monthvec
-    month_dirr = os.path.join(dirr, m)
+    if isinstance(month_or_id, int):
+        month_or_id = "%02d" %month_or_id
+    month_dirr = os.path.join(dirr, month_or_id)
     if climatology:
-        TOT_CG_path = os.path.join(month_dirr, f"TOT-{m}.p")
+        TOT_CG_path = os.path.join(month_dirr, f"TOT-{month_or_id}.p")
         lon, lat, _, _, _, _, _, _, _, _, _ , _ = pickle.load(
             open(TOT_CG_path, "rb")
         )
-        pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{m}.p", "rb"))
-        outfile = f"{month_dirr}/cLCS_{m}"
+        pxt, pyt = pickle.load(open(f"{month_dirr}/cLCS_{month_or_id}.p", "rb"))
+        outfile = f"{month_dirr}/cLCS_{month_or_id}"
     else:
         try:
             lon, lat, _, _, _, _, _, _, _, _, _  = pickle.load(

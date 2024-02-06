@@ -5,6 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
+*.nc
+
 
 # Distribution / packaging
 .Python
@@ -127,3 +129,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#netcdf files too heavy
+*/*/*.nc

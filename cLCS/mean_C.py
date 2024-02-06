@@ -38,8 +38,8 @@ class mean_CG(object):
         directory where the Climatological files are located
     filename: str
         name of the climatological file. Climatological file used here is a ROMS file. Change reader if the file is not ROMS
-    month: int
-        month that is going to be analysed
+    month or id: int or str
+        month that is going to be analysed or id for single release
     dx: int
         Spacing between particles on the x-axis in km. Default grid structure (particle per grid point)
     dy: int
@@ -96,35 +96,40 @@ class mean_CG(object):
         self,
         dirr,
         file,
-        month,
+        month_or_id,
+        climatology=True,
         domain=False,
-        dx0=None,
-        dy0=None,
+        dx0=1,
+        dy0=1,
         T=-7,
-        dt=6,  # six hour time step
+        dt=6*3600,  # six hour time step
         frequency_of_deployments=1,
-        time_step_output=None,  # daily output
+        time_step_output=86400,  # daily output
         z=0,  # surface
         opendrift_reader="reader_ROMS_native_MOANA",
         opendrift_model="OceanDrift",
+        vars_dict=None,
         log_level=20,
-        vars_dict={"mask": "mask_rho"},
         max_speed=5,
         horizontal_diffusivity=0.1,
         advection_scheme="runge-kutta4",
         save_trajectories=False,
         save_daily_CG=False,
-        start_releases=None,
-        end_releases=None,
+        start_release=None,
+        stokes_add=None,
+        stokes_files=None,
+        stokes_reader=None,
+        proj_reader=None,
     ):
         # Environment parameters
         self.dirr = dirr
         self.file = file
-        self.month = month
-        if isinstance(self.month, int):
-            self.m = "%02d" % self.month
-        self.new_directory = os.path.join(self.dirr, self.m)
+        self.month_or_id = month_or_id
+        if isinstance(self.month_or_id, int):
+            self.month_or_id = "%02d" % self.month_or_id
+        self.new_directory = os.path.join(self.dirr, self.month_or_id)
         self.domain = domain
+        self.climatology = climatology
 
         # Particle release parameters
         self.dx0 = dx0
@@ -133,11 +138,12 @@ class mean_CG(object):
         self.dt = dt
         self.frequency_of_deployments = frequency_of_deployments
         self.time_step_output = time_step_output
-        self.start_releases = start_releases
-        self.end_releases = end_releases
+        self.start_release = start_release
+        #self.end_releases = end_releases
 
         # OpenDrift Configuration Parameters
         self.opendrift_reader = opendrift_reader
+        self.proj_reader = proj_reader
         self.opendrift_model = opendrift_model
         self.log_level = log_level
         self.vars_dict = vars_dict
@@ -148,6 +154,11 @@ class mean_CG(object):
         self.save_trajectories = save_trajectories
         self.save_daily_CG = save_daily_CG
 
+        # Stokes addition
+        self.stokes_add = stokes_add
+        self.stokes_files = stokes_files
+        self.stokes_reader = stokes_reader
+        
         # Cauchy-Green terms
         self.lda2total = 0
         self.sqrtlda2total = 0
@@ -167,22 +178,39 @@ class mean_CG(object):
 
     def get_reader(self, file):
         exec(f"from opendrift.readers import {self.opendrift_reader}")
-        reader = eval(self.opendrift_reader).Reader(file)
-        return reader
+        if 'schism' in self.opendrift_reader:
+            self.reader = eval(self.opendrift_reader).Reader(filename = file,
+                                                             proj4 = self.proj_reader,
+                                                             use_3d = False
+                                                             )
+        else:
+            self.reader = eval(self.opendrift_reader).Reader(file)
     
-    def set_opendrift_configuration(self, file):
+    def set_opendrift_configuration(self):
         # self.logger.info("--- Setting OpenDrift Configuration")
         exec(
             f"from opendrift.models.{self.opendrift_model.lower()} import {self.opendrift_model}"
         )
         o = eval(self.opendrift_model)(loglevel=self.log_level)
-        reader = self.get_reader(file)
-        # dynamical landmask if true
+        self.get_reader(self.file)
+        
         o.set_config("general:use_auto_landmask", False)
         o.max_speed = self.max_speed
-        o.add_reader(reader)
-        # keep only particles from the "frame" that are on the ocean
-        o.set_config("seed:ocean_only", True)
+
+        if 'schism' in self.opendrift_reader:
+            from opendrift.readers import reader_global_landmask
+            reader_landmask = reader_global_landmask.Reader()
+            
+            if self.stokes_add:
+                self.add_stokes_schism()
+                
+            o.add_reader([self.reader, reader_landmask])
+            o.set_config('general:coastline_action', 'previous')
+        else:
+            o.add_reader(self.reader)       
+            
+        o.set_config("seed:ocean_only", False) #Particles set on land not moved to ocean
+        
         ###############################
         # PHYSICS of Opendrift
         ###############################
@@ -196,7 +224,7 @@ class mean_CG(object):
         o.set_config("environment:fallback:land_binary_mask", 0)
         o.set_config(
             "drift:advection_scheme", self.advection_scheme
-        )  # or 'runge-kutta'
+        )  
         # note current_uncertainty can be used to replicate an horizontal diffusion s
         o.set_config("drift:current_uncertainty", 0.0)
 
@@ -207,115 +235,118 @@ class mean_CG(object):
         o.disable_vertical_motion()
         #        o.list_config()
         #        o.list_configspec()
-        return o, reader
-    
-    def get_domain(self, ds, ):
-        lonvar = self.vars_dict["lon"]
-        latvar = self.vars_dict["lat"]
-        maskvar = self.vars_dict["mask"]
-        londim = self.vars_dict["lon_dim"]
-        latdim = self.vars_dict["lat_dim"]
-        xi = np.where((np.unique(self.lon)>=self.domain[0]) & (np.unique(self.lon)<=self.domain[1]))[0]
-        yi = np.where((np.unique(self.lat)>=self.domain[2]) & (np.unique(self.lat)<=self.domain[3]))[0]
-        ##Assuming a 2D grid as for roms
-        try:
-            self.lon = ds[lonvar].isel({londim : slice(xi[0], xi[-1]), latdim:slice(yi[0], yi[-1])}).values
-            self.lat = ds[latvar].isel({londim : slice(xi[0], xi[-1]), latdim:slice(yi[0], yi[-1])}).values
-        except:
-            self.lon = ds[lonvar].isel({londim : slice(xi[0], xi[-1])}).values
-            self.lat = ds[latvar].isel({latdim:slice(yi[0], yi[-1])}).values
-        self.mask = ds[maskvar].isel({londim : slice(xi[0], xi[-1]), latdim:slice(yi[0], yi[-1])}).values
-        self.lon_origin = self.lon.min()
-        self.lat_origin = self.lat.min()
+
+        return o
+
+    def add_stokes_schism(self):
+        exec(f"from opendrift.readers import {self.stokes_reader}")
+        stokes = eval(self.stokes_reader).Reader(
+            filename = self.stokes_files
+        )
+        ## velocity component indeces
+        uidx, vidx = 0, 1
+        ## load stokes velocities
+        x_stokes = stokes.dataset['STOKESBAROX'].values
+        y_stokes = stokes.dataset['STOKESBAROY'].values
+
+        ## combined or stokes-only
+        if self.stokes_add == 'only':
+            u_new = x_stokes
+            v_new = y_stokes
+        elif self.stokes_add == 'add':
+            # load current velocities
+            u_vel = self.reader.dataset['dahv'][:,:,uidx].values
+            v_vel = self.reader.dataset['dahv'][:,:,vidx].values
+            # add
+            u_new = u_vel + x_stokes
+            v_new = v_vel + y_stokes
+
+        ## remove current dataset from reader object
+        dahv = self.reader.dataset['dahv'].copy()
+        ds_new = self.reader.dataset.drop(['dahv'])
+        self.reader.__dict__['dataset'] = None
+        
+        ## create new datarray
+        dims = (ds_new.dims['time'], ds_new.dims['nSCHISM_hgrid_node'], ds_new.dims['two'])
+        dims_keys = ['time', 'nSCHISM_hgrid_node', 'two']
+        arr = np.ones(shape=dims)
+        arr[:,:,uidx] = u_new
+        arr[:,:,vidx] = v_new
+        ds_new['dahv'] = xr.DataArray(
+            data=arr, 
+            dims=dims_keys, 
+            coords=dict(
+                time=ds_new.time.values,
+                nSCHISM_hgrid_node = ds_new['nSCHISM_hgrid_node'].values,
+                two = ds_new['two'].values
+            ), 
+            attrs=dahv.attrs
+        )
+        ## assign new dataset to reader object
+        self.reader.__dict__['dataset'] = ds_new
 
     def seed_particles(self, ds):
-        lonvar = self.vars_dict["lon"]
-        latvar = self.vars_dict["lat"]
-        maskvar = self.vars_dict["mask"]
-        self.lon = ds[lonvar].values
-        self.lat = ds[latvar].values
-        self.mask = ds[maskvar].values
-        self.lon_origin = self.lon.min()
-        self.lat_origin = self.lat.min()
         if self.domain:
-            self.get_domain(ds)
-        if self.dx0 and self.dy0:
-            lonmax = self.lon.max()
-            latmax = self.lat.max()
-            xmax, ymax = sph2xy(lonmax, self.lon_origin, latmax, self.lat_origin)
-            x = np.arange(0, xmax*1e-3, self.dx0)
-            y = np.arange(0, ymax*1e-3, self.dy0)
-            self.xspan, self.yspan = np.meshgrid(x,y)
-            lon, lat = xy2sph(self.xspan*1e3, self.lon_origin, self.yspan*1e3, self.lat_origin)
-            from scipy.interpolate import griddata
-            self.mask = griddata((self.lon.ravel(),self.lat.ravel()), self.mask.ravel(), (lon.ravel(), lat.ravel()), method='nearest').reshape(lon.shape)
-            self.lon = lon
-            self.lat = lat
+            self.lon_origin = self.domain[0] 
+            lonmax = self.domain[1]
+            self.lat_origin = self.domain[2]
+            latmax = self.domain[3]
         else:
-            [xspan, yspan] = sph2xy(self.lon, self.lon_origin, self.lat, self.lat_origin)
-            self.xspan = xspan * 1e-3  # [km]
-            self.yspan = yspan * 1e-3  # [km]
-            self.dx0 = np.nanmean(np.diff(self.xspan, axis=1))
-            self.dy0 = np.nanmean(np.diff(self.yspan, axis=0))
-        self.x = np.copy(self.xspan)
-        self.y = np.copy(self.yspan)
-        self.Nx0 = self.xspan.shape[0]
-        self.Ny0 = self.yspan.shape[1]
-        Nxy0 = self.Nx0 * self.Ny0
-        X0 = self.xspan.ravel()
-        Y0 = self.yspan.ravel()
-        # mask the land points from the beginning using mask_rho from roms
-        X0[np.where(self.mask.ravel() == 0)] = np.nan
-        Y0[np.where(self.mask.ravel() == 0)] = np.nan
-
-        lon0, lat0 = xy2sph(X0 * 1e3, self.lon_origin, Y0 * 1e3, self.lat_origin)
-
-        lon0 = ma.masked_where(np.isnan(lon0), lon0)
-        lat0 = ma.masked_where(np.isnan(lat0), lat0)
-        nonanindex = np.invert(np.isnan(lon0))  # non-land particles
-        return lon0, lat0, nonanindex
-
-    def obtain_final_particle_position(self, o, lon0, lat0, nonanindex):
+            try:
+                lonvar = self.vars_dict["lon"]
+                latvar = self.vars_dict["lat"]
+                lon = ds[lonvar].values
+                lat = ds[latvar].values
+                self.lon_origin = lon.min()
+                self.lat_origin = lat.min()
+                lonmax = lon.max()
+                latmax = lat.max()
+            except:
+                print('Please provide lon and lat variable names for mapping in a dictionary')
+        #if self.dx0 and self.dy0:
+        xmax, ymax = sph2xy(lonmax, self.lon_origin, latmax, self.lat_origin)
+        x = np.arange(0, xmax*1e-3, self.dx0)
+        y = np.arange(0, ymax*1e-3, self.dy0)
+        self.xspan, self.yspan = np.meshgrid(x,y)
+        self.lon, self.lat = xy2sph(self.xspan*1e3, self.lon_origin, self.yspan*1e3, self.lat_origin)
+        self.Nx0 = self.xspan.shape[1]
+        self.Ny0 = self.yspan.shape[0]
+    
+    def obtain_final_particle_position(self, o):#, nonanindex):
         self.logger.info("--- Obtaining the final position of particles")
         print("--- Obtaining the final position of particles")
         lon_OpenDrift = o.history["lon"][:]
         lat_OpenDrift = o.history["lat"][:]
-        lon_OpenDrift[np.where(lon_OpenDrift[:] < 0)] = (
-            lon_OpenDrift[np.where(o.history["lon"] < 0)][:] + 360
-        )
-        end_lat = np.zeros(lat0.shape)
-        end_lon = np.zeros(lon0.shape)
-        end_lat[np.where(end_lat == 0)] = np.nan
-        end_lon[np.where(end_lon == 0)] = np.nan
+        #Particles that were deactivated since step 1 (over-land particles)
+        status = o.history["status"][:]
+        nonanindex= np.where(status[:,0]==1)[0] 
         lon = np.zeros(lon_OpenDrift.shape[0])
         lat = np.zeros(lat_OpenDrift.shape[0])
         # If particle is stranded use last location
         for k in range(lon_OpenDrift.shape[0]):
             notmask = np.where(lon_OpenDrift[k, :].mask == False)[0]
-            lon[k] = lon_OpenDrift[k, notmask][-1]
-            lat[k] = lat_OpenDrift[k, notmask][-1]
-        if self.T > 0:
-            end_lon[nonanindex] = lon
-            end_lon[np.where(end_lon[:] < 0)] = (
-                end_lon[np.where(end_lon[:] < 0)][:] + 360
+            if len(notmask)>0:
+                lon[k] = lon_OpenDrift[k, notmask][-1]
+                lat[k] = lat_OpenDrift[k, notmask][-1]
+        lon[np.where(lon[:] < 0)] = (
+                lon[np.where(lon[:] < 0)][:] + 360
             )
-            end_lat[nonanindex] = lat
-        elif (
-            self.T < 0
-        ):  # Opendrift does something that when run backwards it inverts the order
-            end_lon[nonanindex] = lon[::-1]
-            end_lon[np.where(end_lon[:] < 0)] = (
-                end_lon[np.where(end_lon[:] < 0)][:] + 360
-            )
-            end_lat[nonanindex] = lat[::-1]
-        return end_lon, end_lat
+        if self.T < 0:  
+            # Opendrift does something that when run backwards it inverts the order
+            lon = lon[::-1]
+            lat = lat[::-1]
+            status = o.history["status"][::-1]
+            nonanindex= np.where(status[:,0]==1)[0] 
+        lon[nonanindex]=0
+        lat[nonanindex]=0
+        return lon, lat
 
     def lat_lon_to_x_y(self, end_lon, end_lat):
         [end_x, end_y] = sph2xy(end_lon, self.lon_origin, end_lat, self.lat_origin)
         end_x = end_x * 1e-3
         end_y = end_y * 1e-3
-        end_x = end_x.reshape(self.Nx0, self.Ny0)
-        end_y = end_y.reshape(self.Nx0, self.Ny0)
+        end_x = end_x.reshape(self.Ny0, self.Nx0)
+        end_y = end_y.reshape(self.Ny0, self.Nx0)
         return end_x, end_y
 
     def calculate_Cauchy_Green(self, end_x, end_y):
@@ -323,10 +354,11 @@ class mean_CG(object):
         print("--- Calculating Cauchy-Green Tensor")
         dxdy, dxdx = np.gradient(end_x, self.dy0, self.dx0)
         dydy, dydx = np.gradient(end_y, self.dy0, self.dx0)
-        dxdx0 = np.reshape(dxdx, (self.Nx0, self.Ny0))
-        dxdy0 = np.reshape(dxdy, (self.Nx0, self.Ny0))
-        dydx0 = np.reshape(dydx, (self.Nx0, self.Ny0))
-        dydy0 = np.reshape(dydy, (self.Nx0, self.Ny0))
+        dxdx0 = np.reshape(dxdx, (self.Ny0, self.Nx0))
+        dxdy0 = np.reshape(dxdy, (self.Ny0, self.Nx0))
+        dydx0 = np.reshape(dydx, (self.Ny0, self.Nx0))
+        dydy0 = np.reshape(dydy, (self.Ny0, self.Nx0))
+
         C11 = (dxdx0**2) + (dydx0**2)
         C12 = (dxdx0 * dxdy0) + (dydx0 * dydy0)
         C22 = (dxdy0**2) + (dydy0**2)
@@ -338,51 +370,66 @@ class mean_CG(object):
 
     def run(self):
         self.set_directories()  # creates directory for output
-        ds = xr.open_dataset(self.file)
-        if not self.start_releases:
-            start_time = pd.to_datetime(ds["ocean_time"][0].values)
+        self.get_reader(self.file) 
+        if "ROMS" in self.opendrift_reader:
+            self.variable_mapping = self.reader.ROMS_variable_mapping
         else:
-            start_time = self.start_releases
-        if not self.end_releases:
-            end_time = pd.to_datetime(ds["ocean_time"][-1].values)
-        else:
-            end_time = self.end_releases
+            try:
+                self.variable_mapping = self.reader.variable_mapping
+            except:
+                print("Can't obtain variable mapping")
+        #self.var_dict= reader.variable_mapping
+        try:
+            ds = xr.open_dataset(self.file)
+        except:
+            ds = xr.open_mfdataset(self.file)
             
-        if self.T < 0:
-            runtime = [
-                start_time + timedelta(days=int(np.abs(self.T))),
-                end_time + timedelta(days=1),
+        if self.climatology:
+            try:
+                start_time = pd.to_datetime(self.reader.times[0])
+                end_time = pd.to_datetime(self.reader.times[-1])
+            except:
+                start_time = self.reader.times[0]
+                end_time = self.reader.times[-1]
+            if self.T < 0:
+                runtime = [
+                    start_time + timedelta(days=int(np.abs(self.T))),
+                    end_time + timedelta(days=1),
+                ]
+            elif self.T > 0:
+                runtime = [
+                    start_time,
+                    end_time - timedelta(days=int(np.abs(self.T))),
             ]
-        elif self.T > 0:
-            runtime = [
-                start_time,
-                end_time - timedelta(days=int(np.abs(self.T))),
-            ]
-
-        time = create_seed_times(
-            runtime[0], runtime[1], timedelta(days=self.frequency_of_deployments)
-        )
-        time_step = timedelta(hours=self.dt)
+            time = create_seed_times(
+                runtime[0], runtime[1], timedelta(days=self.frequency_of_deployments)
+            )
+        elif not self.climatology:
+            time = self.start_release
+            
+        time_step = timedelta(seconds=self.dt)
         duration = timedelta(days=int(np.abs(self.T)))
 
-        reader = self.get_reader(self.file)
-        self.lon0, self.lat0, nonanindex = self.seed_particles(ds)
+        #reader = self.get_reader(self.file)
+        self.seed_particles(ds)
         for count, t in enumerate(time, 1):
             self.logger.info(f"--- {t} Release")
             print(f"--- {t} Release {count}/{len(time)}")
-            o, reader = self.set_opendrift_configuration(self.file)
+            Count = "%02d" % count
+            o  = self.set_opendrift_configuration()
             d = "%02d" % t.day
             if self.save_trajectories:
-                namefile = f"{self.new_directory}/Trajectories_{self.m}{d}.nc"
+                namefile = f"{self.new_directory}/Trajectories_{self.month_or_id}_{Count}.nc"
             else:
                 namefile = None
             o.seed_elements(
-                self.lon0[nonanindex], self.lat0[nonanindex], time=t, z=self.z
+                self.lon, self.lat, time=t, z=self.z
             )
             # Foward in time
             if self.T > 0:
                 o.run(
-                    duration=duration,
+                    #duration=duration,
+                    end_time = t+duration,
                     time_step=time_step,
                     time_step_output=self.time_step_output,
                     outfile=namefile,
@@ -390,16 +437,14 @@ class mean_CG(object):
             # Backward in time
             elif self.T < 0:
                 o.run(
-                    duration=duration,
+                    #duration=duration,
+                    end_time = t-duration,
                     time_step=-time_step,
                     time_step_output=self.time_step_output,
                     outfile=namefile,
                 )
 
-            end_lon, end_lat = self.obtain_final_particle_position(
-                o, self.lon0, self.lat0, nonanindex
-            )
-
+            end_lon, end_lat = self.obtain_final_particle_position(o)
             end_x, end_y = self.lat_lon_to_x_y(end_lon, end_lat)
 
             C11, C12, C22, lda2, ftle = self.calculate_Cauchy_Green(end_x, end_y)
@@ -412,10 +457,10 @@ class mean_CG(object):
             self.C12total += C12
             if self.save_daily_CG:
                 pickle.dump(
-                    [self.lon, self.lat, lda2, np.sqrt(lda2), self.T, ftle, C11, C22, C12, self.x, self.y],
-                    open(f"{self.new_directory}/LCS_{self.m}{d}-CG.p", "wb"),
+                    [self.lon, self.lat, lda2, np.sqrt(lda2), self.T, ftle, C11, C22, C12, self.xspan, self.yspan],
+                    open(f"{self.new_directory}/LCS_{self.month_or_id}_{Count}-CG.p", "wb"),
                 )
-            del o, reader
+            del o, self.reader
         self.count = count
         pickle.dump(
                 [
@@ -428,13 +473,22 @@ class mean_CG(object):
                     self.C11total,
                     self.C22total,
                     self.C12total,
-                    self.x,
-                    self.y,
+                    self.xspan,
+                    self.yspan,
                     self.count,
                 ],
-                open(f"{self.new_directory}/TOT-{self.m}.p", "wb"),
+                open(f"{self.new_directory}/TOT-{self.month_or_id}.p", "wb"),
             )
-        
-        print(
-            f"Calculation of climatological LCS done for {calendar.month_name[self.month]}"
-        )
+        try:
+            print(
+                f"Calculation of climatological LCS done for {calendar.month_name[self.month_or_id]}"
+            )
+        except:
+            if self.climatology:
+                print(
+                    f"Calculation of climatological LCS done for {self.month_or_id}"
+                )
+            else:
+                print(
+                    f"Calculation of LCS done for {self.month_or_id}"
+                )
