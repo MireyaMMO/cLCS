@@ -15,7 +15,7 @@ Climatological Lagrangian Coherent Structure calculation using python based on t
 
 
 ## Description
-This repository contains the scripts needed to deploy a series of particle releases using OpenDrift and calculate the  associated climatological Lagrangian Coherent Structures. The user can define a variety of parameters, for more information see the [jupyter notebook example](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_complete_run.ipynb). Support of quad-triangular unstructured grids such as SCHISM outputs is being tested. The main objective of this repository is to calculate climatological LCSs, however options are provided if the user is interested in calculating non-climatological LCSs.
+This repository contains the scripts needed to deploy a series of particle releases using OpenDrift and calculate the  associated climatological Lagrangian Coherent Structures. The user can define a variety of parameters, for more information see the [jupyter notebook example](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_ROMS.ipynb). Support of quad-triangular unstructured grids such as SCHISM outputs is supported ([hydro+waves](https://github.com/MireyaMMO/cLCS/blob/main/examples/02_LCS_SCHISM.ipynb), [stokes drift only](https://github.com/MireyaMMO/cLCS/blob/main/examples/03_LCS_SCHISM_stokes_only.ipynb)). The main objective of this repository is to calculate climatological LCSs, however options are provided if the user is interested in calculating non-climatological LCSs.
 
 
 ## Conda Installation
