@@ -48,6 +48,7 @@ def cLCSrho_cartopy_colour(
     climatology=True,
     squeezelines_file=None,
     CG_file=None,
+    LCS_strength=None,
 ):
     print(f"---- Generating figure with cartopy features")
     if not projection:
@@ -89,7 +90,7 @@ def cLCSrho_cartopy_colour(
             pxt[np.where(pxt < 0)] = np.nan
             pyt[np.where(pyt < 0)] = np.nan
             z = np.log(sqrtlda2total)
-            z[np.where(z>3)]=np.nan
+            #z[np.where(z>10)]=np.nan
             outfile = squeezelines_file.split(".")[0]
         except:
             print("Path to CG file and squeezelines file must be provided")
@@ -115,7 +116,8 @@ def cLCSrho_cartopy_colour(
 
     cmap = get_colourmap(colourmap)
     print(f"---- Squeezeline and associated data loaded")
-
+    if LCS_strength=='weak':
+        climatology=True
     for kk in range(0, nLCS, line_spacing): 
         xs = Plon[kk, :]
         ys = Plat[kk, :]
