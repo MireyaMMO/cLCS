@@ -85,7 +85,7 @@ docker run -ti mmontao/clcs:$tag bash
 ### [Examples](https://github.com/MireyaMMO/cLCS/tree/main/examples)
   - [01_cLCS_ROMS.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/01_cLCS_ROMS.ipynb) This jupyter notebook displays an example of how to compute the cLCS calculation using the data from the thesis referenced below. 
   - [02_LCS_SCHISM.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/02_LCS_SCHISM.ipynb) This jupyter notebook displays an example of how to compute the LCS calculation using an unstructured-hydrodynamic model (SCHISM) and a wave model. 
-  - [03_LCS_SCHISM_stokes_only.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/02_LCS_SCHISM_stokes_only.ipynb) This jupyter notebook displays an example of how to compute the LCS calculation only considering stokes drift. 
+  - [03_LCS_SCHISM_stokes_only.ipynb](https://github.com/MireyaMMO/cLCS/blob/main/examples/03_LCS_SCHISM_stokes_only.ipynb) This jupyter notebook displays an example of how to compute the LCS calculation only considering stokes drift. 
 
 ## References
 **cLCS description and matlab toolbox**
