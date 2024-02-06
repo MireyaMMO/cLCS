@@ -13,9 +13,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging
 
 
-def plot_colourline(x, y, c, cmap, ax=None, lw=0.8, transform=None):
+def plot_colourline(x, y, c, cmap, ax=None, lw=0.8, transform=None, climatology=None):
     # Plots LCSs using coloured lines to define strength of attraction
-    c = cmap((c - 0.4) / (1.4 - 0.4))
+    if climatology:
+        c = cmap((c - 0.4) / (1.4 - 0.4))
+    else:
+        c = cmap((c - 0.4) / (3.0 - 0.4))
     if ax == None:
         ax = plt.gca()
     for i in np.arange(len(x) - 1):
@@ -118,7 +121,7 @@ def cLCSrho_cartopy_colour(
         ys = Plat[kk, :]
         zs = interpolator(xs, ys)
         #zs[np.where(np.isnan(zs))] = 0
-        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw, transform=ccrs.PlateCarree())
+        plot_colourline(xs, ys, zs, cmap, ax=ax, lw=lw, transform=ccrs.PlateCarree(), climatology=climatology)
     if save_fig:
         print(f"---- Saving Figure")
         fig.savefig(f"{outfile}.{save_fig}")

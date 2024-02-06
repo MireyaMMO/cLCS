@@ -25,10 +25,11 @@ class compute_cLCS_squeezelines(object):
         self,
         dirr,
         month_or_id,
-        arclength=500,
+        arclength=150,
         nxb=25,
         nyb=25,
         climatology=True,
+        files=None,
     ):
         self.dirr = dirr
         self.month_or_id = month_or_id
@@ -36,6 +37,7 @@ class compute_cLCS_squeezelines(object):
         self.nxb = nxb
         self.nyb = nyb
         self.climatology= climatology
+        self.files = files
         self.logger = logging
 
     def squeezeline(self, C11, C12, C22, xi, yi, ArcLength):
@@ -261,8 +263,9 @@ class compute_cLCS_squeezelines(object):
             pickle.dump([self.pxt, self.pyt], open(f"{month_dirr}/cLCS_{self.month_or_id}.p", "wb"))
 
         else: 
-            LCS_files = sorted(glob.glob(f"{month_dirr}/LCS_{self.month_or_id}*-CG.p"))
-            for file in LCS_files:
+            if not self.files:
+                self.files = sorted(glob.glob(f"{month_dirr}/LCS_{self.month_or_id}*-CG.p"))
+            for file in self.files:
                 outfile = file.split('-')[0]
                 (
                             _,
@@ -285,3 +288,4 @@ class compute_cLCS_squeezelines(object):
                 self.pxt = np.delete(self.pxt, zeros, 0)
                 self.pyt = np.delete(self.pyt, zeros, 0)
                 pickle.dump([self.pxt, self.pyt], open(f"{outfile}.p", "wb"))
+                

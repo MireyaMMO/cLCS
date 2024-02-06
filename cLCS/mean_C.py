@@ -119,6 +119,7 @@ class mean_CG(object):
         stokes_add=None,
         stokes_files=None,
         stokes_reader=None,
+        proj_reader=None,
     ):
         # Environment parameters
         self.dirr = dirr
@@ -142,6 +143,7 @@ class mean_CG(object):
 
         # OpenDrift Configuration Parameters
         self.opendrift_reader = opendrift_reader
+        self.proj_reader = proj_reader
         self.opendrift_model = opendrift_model
         self.log_level = log_level
         self.vars_dict = vars_dict
@@ -176,7 +178,13 @@ class mean_CG(object):
 
     def get_reader(self, file):
         exec(f"from opendrift.readers import {self.opendrift_reader}")
-        self.reader = eval(self.opendrift_reader).Reader(file)
+        if 'schism' in self.opendrift_reader:
+            self.reader = eval(self.opendrift_reader).Reader(filename = file,
+                                                             proj4 = self.proj_reader,
+                                                             use_3d = False
+                                                             )
+        else:
+            self.reader = eval(self.opendrift_reader).Reader(file)
     
     def set_opendrift_configuration(self):
         # self.logger.info("--- Setting OpenDrift Configuration")
@@ -237,7 +245,6 @@ class mean_CG(object):
         )
         ## velocity component indeces
         uidx, vidx = 0, 1
-        
         ## load stokes velocities
         x_stokes = stokes.dataset['STOKESBAROX'].values
         y_stokes = stokes.dataset['STOKESBAROY'].values
@@ -408,10 +415,11 @@ class mean_CG(object):
         for count, t in enumerate(time, 1):
             self.logger.info(f"--- {t} Release")
             print(f"--- {t} Release {count}/{len(time)}")
+            Count = "%02d" % count
             o  = self.set_opendrift_configuration()
             d = "%02d" % t.day
             if self.save_trajectories:
-                namefile = f"{self.new_directory}/Trajectories_{self.month_or_id}{d}.nc"
+                namefile = f"{self.new_directory}/Trajectories_{self.month_or_id}_{Count}.nc"
             else:
                 namefile = None
             o.seed_elements(
@@ -420,7 +428,8 @@ class mean_CG(object):
             # Foward in time
             if self.T > 0:
                 o.run(
-                    duration=duration,
+                    #duration=duration,
+                    end_time = t+duration,
                     time_step=time_step,
                     time_step_output=self.time_step_output,
                     outfile=namefile,
@@ -428,7 +437,8 @@ class mean_CG(object):
             # Backward in time
             elif self.T < 0:
                 o.run(
-                    duration=duration,
+                    #duration=duration,
+                    end_time = t-duration,
                     time_step=-time_step,
                     time_step_output=self.time_step_output,
                     outfile=namefile,
@@ -448,7 +458,7 @@ class mean_CG(object):
             if self.save_daily_CG:
                 pickle.dump(
                     [self.lon, self.lat, lda2, np.sqrt(lda2), self.T, ftle, C11, C22, C12, self.xspan, self.yspan],
-                    open(f"{self.new_directory}/LCS_{self.month_or_id}_{d}-CG.p", "wb"),
+                    open(f"{self.new_directory}/LCS_{self.month_or_id}_{Count}-CG.p", "wb"),
                 )
             del o, self.reader
         self.count = count
@@ -474,6 +484,11 @@ class mean_CG(object):
                 f"Calculation of climatological LCS done for {calendar.month_name[self.month_or_id]}"
             )
         except:
-            print(
-                f"Calculation of climatological LCS done for {self.month_or_id}"
-            )
+            if self.climatology:
+                print(
+                    f"Calculation of climatological LCS done for {self.month_or_id}"
+                )
+            else:
+                print(
+                    f"Calculation of LCS done for {self.month_or_id}"
+                )
