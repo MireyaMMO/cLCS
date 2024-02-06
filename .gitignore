@@ -130,5 +130,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-SCHISM/test/Trajectories_test05.nc
-SCHISM/test_no_stokes/Trajectories_test_no_stokes05.nc
+#netcdf files too heavy
+*/*/*.nc
